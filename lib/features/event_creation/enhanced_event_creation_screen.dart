@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,26 +7,24 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'dart:math';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
-import 'package:vector_math/vector_math.dart' as vector_math;
 import 'package:geocoding/geocoding.dart';
 
-class EventCreationScreen extends ConsumerStatefulWidget {
-  const EventCreationScreen({super.key});
+class EnhancedEventCreationScreen extends ConsumerStatefulWidget {
+  const EnhancedEventCreationScreen({super.key});
 
   @override
-  ConsumerState<EventCreationScreen> createState() => _EventCreationScreenState();
+  ConsumerState<EnhancedEventCreationScreen> createState() => _EnhancedEventCreationScreenState();
 }
 
-class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
+class _EnhancedEventCreationScreenState extends ConsumerState<EnhancedEventCreationScreen> {
   // Step management
   int _currentStep = 0;
-  final int _totalSteps = 4; // Updated to 4 steps
+  final int _totalSteps = 4;
   
   // Step 1: Event Details
   final _formKey = GlobalKey<FormState>();
@@ -63,7 +59,6 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   
   // Step 4: Boundary Placement
   final List<LatLng> _boundaryLocations = [];
-  int _currentBoundaryIndex = 0;
   
   // Map state
   LatLng _center = const LatLng(37.7749, -122.4194); // Default to San Francisco
@@ -90,7 +85,6 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      // Check location permissions first
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -98,7 +92,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Location permission is required to get your current location'),
+                content: Text('Location permission is required'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -111,7 +105,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permissions are permanently denied. Please enable them in settings.'),
+              content: Text('Location permissions are permanently denied'),
               backgroundColor: Colors.red,
             ),
           );
@@ -119,13 +113,12 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         return;
       }
 
-      // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location services are disabled. Please enable GPS.'),
+              content: Text('Location services are disabled'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -316,43 +309,19 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   bool _canProceedToNextStep() {
     switch (_currentStep) {
       case 0: // Event Details
-        final canProceed = _nameController.text.isNotEmpty &&
+        return _nameController.text.isNotEmpty &&
                _descriptionController.text.isNotEmpty &&
                _venueController.text.isNotEmpty &&
                _nftSupplyController.text.isNotEmpty &&
                int.tryParse(_nftSupplyController.text) != null &&
                _nftImagePath != null;
-        
-        // Debug logging
-        if (!canProceed) {
-          print('Step 0 validation failed:');
-          print('Name: ${_nameController.text.isNotEmpty}');
-          print('Description: ${_descriptionController.text.isNotEmpty}');
-          print('Venue: ${_venueController.text.isNotEmpty}');
-          print('NFT Supply: ${_nftSupplyController.text.isNotEmpty}');
-          print('NFT Supply Valid: ${int.tryParse(_nftSupplyController.text) != null}');
-          print('NFT Image: ${_nftImagePath != null}');
-        }
-        return canProceed;
-        
       case 1: // Area Selection
-        final canProceed = _selectedAreaCenter != null;
-        if (!canProceed) {
-          print('Step 1 validation failed: No area center selected');
-        }
-        return canProceed;
-        
+        return _selectedAreaCenter != null;
       case 2: // Boundary Configuration
-        return true; // Always can proceed from configuration
-        
+        return true;
       case 3: // Boundary Placement
         final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
-        final canProceed = _boundaryLocations.length >= nftSupplyCount;
-        if (!canProceed) {
-          print('Step 3 validation failed: Need $nftSupplyCount boundaries, have ${_boundaryLocations.length}');
-        }
-        return canProceed;
-        
+        return _boundaryLocations.length >= nftSupplyCount;
       default:
         return false;
     }
@@ -632,8 +601,8 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 child: _nftImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          File(_nftImagePath!),
+                        child: Image.asset(
+                          _nftImagePath!,
                           fit: BoxFit.cover,
                         ),
                       )
@@ -678,8 +647,8 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
                   ),
                   style: const TextStyle(color: Colors.white),
                   onSubmitted: (_) => _searchLocation(),
@@ -940,43 +909,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   }
 
   Future<void> _createEvent() async {
-    print('Creating event...');
-    print('Current step: $_currentStep');
-    print('Can proceed: ${_canProceedToNextStep()}');
-    
-    // Only validate form if we're on step 0 (event details)
-    if (_currentStep == 0 && _formKey.currentState != null) {
-      if (!_formKey.currentState!.validate()) {
-        print('Form validation failed');
-        return;
-      }
-    }
+    if (!_formKey.currentState!.validate()) return;
     
     final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
-    print('NFT Supply Count: $nftSupplyCount');
-    print('Boundary Locations: ${_boundaryLocations.length}');
-    print('Event Name: ${_nameController.text}');
-    print('Event Description: ${_descriptionController.text}');
-    print('Venue: ${_venueController.text}');
-    print('NFT Image: $_nftImagePath');
-    
-    // Check if all required data is available
-    if (_nameController.text.isEmpty || 
-        _descriptionController.text.isEmpty || 
-        _venueController.text.isEmpty || 
-        _nftImagePath == null) {
-      print('Missing required data');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete all required fields in step 1'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-    
     if (_boundaryLocations.length < nftSupplyCount) {
-      print('Not enough boundary locations placed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please place all $nftSupplyCount boundary locations'),
@@ -1067,79 +1003,22 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.backgroundColor,
-        title: Row(
-          children: [
-            Icon(Icons.celebration, color: AppTheme.primaryColor),
-            const SizedBox(width: 8),
-            const Text(
-              'Event Created Successfully!',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
+        title: const Text(
+          'Event Created Successfully!',
+          style: TextStyle(color: Colors.white),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Your Event Code:',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+            Text(
+              'Event Code: ${event.eventCode}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.primaryColor),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      event.eventCode,
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      // Copy to clipboard
-                      Clipboard.setData(ClipboardData(text: event.eventCode));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Event code copied to clipboard!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.copy, color: AppTheme.primaryColor),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
             const Text(
-              'Share this code with participants to join your event and start claiming NFTs!',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Participants can use this code to join the event and see NFT boundaries in AR.',
-                    style: TextStyle(color: Colors.orange, fontSize: 12),
-                  ),
-                ),
-              ],
+              'Share this code with participants to join your event.',
+              style: TextStyle(color: Colors.white70),
             ),
           ],
         ),
@@ -1151,117 +1030,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             },
             child: const Text('Go to Events'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Navigate to event join screen with the code
-              context.go('/event-join?code=${event.eventCode}');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            child: const Text('Join Event Now'),
-          ),
         ],
       ),
     );
-  }
-
-  String _getValidationMessage() {
-    switch (_currentStep) {
-      case 0: // Event Details
-        if (_nameController.text.isEmpty) return 'Enter event title';
-        if (_descriptionController.text.isEmpty) return 'Enter description';
-        if (_venueController.text.isEmpty) return 'Enter venue';
-        if (_nftSupplyController.text.isEmpty) return 'Enter NFT count';
-        if (int.tryParse(_nftSupplyController.text) == null) return 'Valid NFT count';
-        if (_nftImagePath == null) return 'Add NFT image';
-        return 'Complete all fields';
-        
-      case 1: // Area Selection
-        return 'Select event area';
-        
-      case 2: // Boundary Configuration
-        return 'Configure boundaries';
-        
-      case 3: // Boundary Placement
-        final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
-        return 'Place ${nftSupplyCount - _boundaryLocations.length} more boundaries';
-        
-      default:
-        return 'Complete current step';
-    }
-  }
-
-  Future<void> _testDatabaseConnection() async {
-    try {
-      final supabaseService = SupabaseService();
-      
-      // Test basic connection using the testConnection method
-      final isConnected = await supabaseService.testConnection();
-      
-      if (isConnected) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Database connection successful!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Database connection failed!'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Database connection error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 10),
-        ),
-      );
-    }
-  }
-
-  Future<void> _testCreateMinimalEvent() async {
-    try {
-      final supabaseService = SupabaseService();
-      
-      // Create a minimal test event
-      final testEvent = Event(
-        name: 'Test Event',
-        description: 'Test Description',
-        organizerWalletAddress: 'test_wallet',
-        latitude: 37.7749,
-        longitude: -122.4194,
-        venueName: 'Test Venue',
-        boundaries: [],
-        nftSupplyCount: 1,
-      );
-      
-      final createdEvent = await supabaseService.createEvent(testEvent);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Test event created successfully! Code: ${createdEvent.eventCode}'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Test event creation failed: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 10),
-        ),
-      );
-    }
   }
 
   @override
@@ -1309,142 +1080,55 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           // Navigation buttons
           Container(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: Row(
               children: [
-                // Debug info (only show in development)
-                if (true) // Change to false in production
-                  Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Step: $_currentStep | Can Proceed: ${_canProceedToNextStep()} | Boundaries: ${_boundaryLocations.length}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
+                if (_currentStep > 0)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _previousStep,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Colors.white30),
                       ),
-                      if (_currentStep == _totalSteps - 1)
-                        Column(
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  print('Test button pressed!');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Test button works!'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                child: const Text(
-                                  'Test Button (Should Show Snackbar)',
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ElevatedButton(
-                                onPressed: _testCreateMinimalEvent,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                child: const Text(
-                                  'Test Database Connection',
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                      child: const Text(
+                        'Previous',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ),
-                Row(
-                  children: [
-                    if (_currentStep > 0)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _previousStep,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Colors.white30),
-                          ),
-                          child: const Text(
-                            'Previous',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
+                if (_currentStep > 0) const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _canProceedToNextStep() 
+                        ? (_currentStep == _totalSteps - 1 ? _createEvent : _nextStep)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    if (_currentStep > 0) const SizedBox(width: 16),
-                                          Expanded(
-                      child: ElevatedButton(
-                        onPressed: _canProceedToNextStep() 
-                            ? (_currentStep == _totalSteps - 1 ? () {
-                                print('Create Event button pressed!');
-                                print('Current step: $_currentStep');
-                                print('Can proceed: ${_canProceedToNextStep()}');
-                                _createEvent();
-                              } : _nextStep)
-                            : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _canProceedToNextStep() 
-                                ? AppTheme.primaryColor 
-                                : Colors.grey,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
+                          )
+                        : Text(
+                            _currentStep == _totalSteps - 1 ? 'Create Event' : 'Next',
+                            style: const TextStyle(color: Colors.white, fontSize: 16),
                           ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _currentStep == _totalSteps - 1 ? 'Create Event' : 'Next',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                                    ),
-                                    if (!_canProceedToNextStep()) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _getValidationMessage(),
-                                        style: const TextStyle(color: Colors.white70, fontSize: 10),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 }
-

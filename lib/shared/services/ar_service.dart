@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:math';
-import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import '../models/boundary.dart';
 import '../models/event.dart';
+import 'supabase_service.dart';
 
 class ARService {
   static final ARService _instance = ARService._internal();
@@ -20,15 +19,24 @@ class ARService {
   Event? _currentEvent;
   List<Boundary> _boundaries = [];
   List<Boundary> _claimedBoundaries = [];
+  List<Boundary> _visibleBoundaries = [];
+
+  // Services
+  late SupabaseService _supabaseService;
 
   // Callbacks
   Function(Boundary)? onBoundaryDetected;
   Function(Boundary)? onBoundaryClaimed;
   Function(String)? onProximityUpdate;
   Function(int, int)? onProgressUpdate; // claimed, total
+  Function(List<Boundary>)? onVisibleBoundariesUpdate;
+  Function(List<Boundary>)? onClaimedBoundariesUpdate;
+  Function(Position)? onPositionUpdate;
 
   // Initialize AR session
   Future<void> initializeAR() async {
+    _supabaseService = SupabaseService();
+    
     // Request location permissions
     await _requestLocationPermissions();
     
@@ -40,59 +48,54 @@ class ARService {
   void setEvent(Event event) {
     _currentEvent = event;
     _boundaries = event.boundaries;
+    
+    // Separate claimed and unclaimed boundaries
+    _claimedBoundaries = _boundaries.where((b) => b.isClaimed).toList();
+    _visibleBoundaries = _boundaries.where((b) => !b.isClaimed).toList();
+    
+    // Trigger callbacks
+    onClaimedBoundariesUpdate?.call(_claimedBoundaries);
+    onVisibleBoundariesUpdate?.call(_visibleBoundaries);
   }
 
   // Start location tracking
   Future<void> _startLocationTracking() async {
-    try {
-      // Get initial position
-      _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      print('Initial position: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
-      _checkBoundaries();
-      
-      // Start position stream
-      _positionSubscription = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 1, // Update every 1 meter
-        ),
-      ).listen((Position position) {
-        _currentPosition = position;
-        print('Position updated: ${position.latitude}, ${position.longitude}');
-        _checkBoundaries();
-      });
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 1, // Update every 1 meter
+    );
 
-      // Start accelerometer for movement detection
-      _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
-        // Detect significant movement
-        double magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-        if (magnitude > 15) { // Threshold for movement
-          _checkBoundaries();
-        }
-      });
-    } catch (e) {
-      print('Error starting location tracking: $e');
-      onProximityUpdate?.call('Error getting location: $e');
-    }
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen(
+      (Position position) {
+        _currentPosition = position;
+        onPositionUpdate?.call(position);
+        _checkBoundaries();
+        _updateBoundaryVisibility();
+      },
+      onError: (error) {
+        print('Error getting location: $error');
+        onProximityUpdate?.call('Location error: $error');
+      },
+    );
   }
 
   // Check boundaries for proximity
   void _checkBoundaries() {
-    if (_currentPosition == null || _boundaries.isEmpty) {
-      print('No position or boundaries available');
-      onProximityUpdate?.call('No boundaries found for this event');
+    if (_currentPosition == null || _visibleBoundaries.isEmpty) {
+      print('No position or unclaimed boundaries available');
+      onProximityUpdate?.call('No unclaimed boundaries found for this event');
       return;
     }
 
-    print('Checking ${_boundaries.length} boundaries at position: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+    print('Checking ${_visibleBoundaries.length} unclaimed boundaries at position: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
     
     Boundary? closestBoundary;
     double closestDistance = double.infinity;
     String proximityHint = 'Exploring event area...';
 
-    for (Boundary boundary in _boundaries) {
+    for (Boundary boundary in _visibleBoundaries) {
       if (boundary.isClaimed) {
         print('Boundary ${boundary.name} is already claimed');
         continue;
@@ -111,12 +114,18 @@ class ARService {
         closestBoundary = boundary;
       }
 
-      // Check if within claiming distance (2 meters)
+      // Check if within claiming distance (2 meters) or visible distance (5 meters)
       if (distance <= boundary.radius) {
         print('Within claiming distance of ${boundary.name}!');
         onBoundaryDetected?.call(boundary);
         onProximityUpdate?.call('Boundary detected! Tap to claim!');
         return; // Found a claimable boundary, exit early
+      } else if (distance <= 5.0) {
+        // Show boundary within 5 meters but not yet claimable
+        print('Boundary ${boundary.name} visible at ${distance.toStringAsFixed(2)}m');
+        onBoundaryDetected?.call(boundary);
+        onProximityUpdate?.call('Getting closer! Move within 2m to claim.');
+        return;
       }
     }
 
@@ -128,14 +137,37 @@ class ARService {
       );
       print('Closest boundary: ${closestBoundary!.name} at ${closestDistance.toStringAsFixed(2)}m');
     } else {
-      proximityHint = 'No boundaries found';
+      proximityHint = 'No unclaimed boundaries found';
     }
 
     onProximityUpdate?.call(proximityHint);
 
     // Update progress
-    int claimed = _boundaries.where((b) => b.isClaimed).length;
+    int claimed = _claimedBoundaries.length;
     onProgressUpdate?.call(claimed, _boundaries.length);
+  }
+
+  // Update boundary visibility based on user position
+  void _updateBoundaryVisibility() {
+    if (_currentPosition == null) return;
+
+    List<Boundary> newlyVisible = [];
+    
+    for (Boundary boundary in _boundaries) {
+      bool shouldBeVisible = boundary.shouldBeVisible(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+      
+      if (shouldBeVisible && !_visibleBoundaries.contains(boundary)) {
+        newlyVisible.add(boundary);
+      }
+    }
+
+    if (newlyVisible.isNotEmpty) {
+      _visibleBoundaries.addAll(newlyVisible);
+      onVisibleBoundariesUpdate?.call(_visibleBoundaries);
+    }
   }
 
   // Claim boundary
@@ -152,21 +184,45 @@ class ARService {
     }
 
     try {
+      // Get user wallet address (you should implement this based on your wallet service)
+      String walletAddress = "user_wallet_address"; // Replace with actual wallet
+      
+      // Claim boundary in database
+      await _supabaseService.claimBoundary(boundary.id, walletAddress);
+      
       // Mark as claimed locally
-      Boundary claimedBoundary = boundary.claim("user_wallet_address"); // Replace with actual wallet
+      Boundary claimedBoundary = boundary.claim(walletAddress);
       _claimedBoundaries.add(claimedBoundary);
       
-      // Update the boundary in the list
+      // Remove from visible boundaries
+      _visibleBoundaries.removeWhere((b) => b.id == boundary.id);
+      
+      // Update the boundary in the main list
       int index = _boundaries.indexWhere((b) => b.id == boundary.id);
       if (index != -1) {
         _boundaries[index] = claimedBoundary;
       }
 
-      // Trigger callback
+      // Log proximity for analytics
+      await _supabaseService.logUserProximity(
+        userWalletAddress: walletAddress,
+        boundaryId: boundary.id,
+        eventId: boundary.eventId,
+        distanceMeters: boundary.distanceFrom(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+        ),
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+      );
+
+      // Trigger callbacks
       onBoundaryClaimed?.call(claimedBoundary);
+      onClaimedBoundariesUpdate?.call(_claimedBoundaries);
+      onVisibleBoundariesUpdate?.call(_visibleBoundaries);
 
       // Update progress
-      int claimed = _boundaries.where((b) => b.isClaimed).length;
+      int claimed = _claimedBoundaries.length;
       onProgressUpdate?.call(claimed, _boundaries.length);
 
       // Show success message
@@ -176,6 +232,28 @@ class ARService {
       print('Error claiming boundary: $e');
       onProximityUpdate?.call("Failed to claim boundary. Try again.");
     }
+  }
+
+  // Get boundaries that should be visible in AR (within 2 meters)
+  List<Boundary> getVisibleBoundaries() {
+    if (_currentPosition == null) return [];
+    
+    return _boundaries.where((boundary) {
+      return boundary.shouldBeVisible(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+    }).toList();
+  }
+
+  // Get claimed boundaries for this user
+  List<Boundary> getClaimedBoundaries() {
+    return _claimedBoundaries;
+  }
+
+  // Get all boundaries with their claim status
+  List<Boundary> getAllBoundaries() {
+    return _boundaries;
   }
 
   // Request location permissions

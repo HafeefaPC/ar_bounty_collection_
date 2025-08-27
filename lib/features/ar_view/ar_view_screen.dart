@@ -1,15 +1,36 @@
 import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:confetti/confetti.dart';
-import 'package:lottie/lottie.dart';
+import 'package:sensors_plus/sensors_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/ar_service.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../core/theme/app_theme.dart';
+
+// AR Element class for positioning NFT images in 3D space
+class ARElement {
+  final Boundary boundary;
+  final double screenX;
+  final double screenY;
+  final double distance;
+  final bool isClaimable;
+  final bool isVisible;
+
+  ARElement({
+    required this.boundary,
+    required this.screenX,
+    required this.screenY,
+    required this.distance,
+    required this.isClaimable,
+    required this.isVisible,
+  });
+}
 
 class ARViewScreen extends ConsumerStatefulWidget {
   final String eventCode;
@@ -30,6 +51,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   Event? currentEvent;
   List<Boundary> boundaries = [];
   List<Boundary> claimedBoundaries = [];
+  List<Boundary> visibleBoundaries = [];
 
   // UI State
   bool isLoading = true;
@@ -40,10 +62,22 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   bool showClaimedBoundaries = false;
   Boundary? detectedBoundary;
 
+  // AR Positioning and Sensors
+  double? _currentLatitude;
+  double? _currentLongitude;
+  double _deviceAzimuth = 0.0; // Device heading in degrees
+  double _devicePitch = 0.0;   // Device pitch in degrees
+  double _deviceRoll = 0.0;    // Device roll in degrees
+  
+  // AR Elements positioning
+  List<ARElement> arElements = [];
+  
   // Animations
   late ConfettiController confettiController;
   late AnimationController pulseController;
   late Animation<double> pulseAnimation;
+  late AnimationController bounceController;
+  late Animation<double> bounceAnimation;
 
   @override
   void initState() {
@@ -52,6 +86,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     _setupAnimations();
     _loadEventData();
     _initializeCamera();
+    _initializeSensors();
   }
 
   void _initializeServices() {
@@ -69,6 +104,15 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       CurvedAnimation(parent: pulseController, curve: Curves.easeInOut),
     );
     pulseController.repeat(reverse: true);
+
+    bounceController = AnimationController(
+      duration: const Duration(seconds: 2), // Slower animation
+      vsync: this,
+    );
+    bounceAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: bounceController, curve: Curves.easeInOut),
+    );
+    bounceController.repeat(reverse: true); // Make it repeat
   }
 
   Future<void> _initializeCamera() async {
@@ -90,6 +134,104 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     }
   }
 
+  void _initializeSensors() {
+    // Listen to device orientation changes
+    gyroscopeEvents.listen((GyroscopeEvent event) {
+      setState(() {
+        _devicePitch += event.y * 0.1; // Convert to degrees
+        _deviceRoll += event.x * 0.1;
+      });
+      _updateARPositions();
+    });
+
+    // Listen to compass/magnetometer for heading
+    magnetometerEvents.listen((MagnetometerEvent event) {
+      // Calculate azimuth from magnetometer data
+      double azimuth = atan2(event.y, event.x) * 180 / pi;
+      setState(() {
+        _deviceAzimuth = azimuth;
+      });
+      _updateARPositions();
+    });
+  }
+
+  void _updateARPositions() {
+    if (_currentLatitude == null || _currentLongitude == null || boundaries.isEmpty) {
+      return;
+    }
+
+    List<ARElement> newElements = [];
+    
+    for (Boundary boundary in boundaries) {
+      if (boundary.isClaimed) continue;
+      
+      double distance = boundary.distanceFrom(_currentLatitude!, _currentLongitude!);
+      
+      // Only show boundaries within 5 meters
+      if (distance > 5.0) continue;
+      
+      // Calculate bearing to boundary
+      double bearing = _calculateBearing(_currentLatitude!, _currentLongitude!, 
+                                       boundary.latitude, boundary.longitude);
+      
+      // Calculate relative angle from device heading
+      double relativeAngle = bearing - _deviceAzimuth;
+      
+      // Normalize angle to -180 to 180 degrees
+      while (relativeAngle > 180) relativeAngle -= 360;
+      while (relativeAngle < -180) relativeAngle += 360;
+      
+      // Only show if within 90 degrees of device heading (field of view)
+      if (relativeAngle.abs() > 90) continue;
+      
+      // Convert to screen coordinates (improved 3D projection)
+      double screenWidth = MediaQuery.of(context).size.width;
+      double screenHeight = MediaQuery.of(context).size.height;
+      
+      // Map angle to screen X position (center is 0 degrees)
+      double screenX = screenWidth / 2 + (relativeAngle * screenWidth / 180);
+      
+      // Map distance to screen Y position (closer = higher on screen)
+      double screenY = screenHeight * 0.3 + (distance * 20); // Closer objects appear higher
+      
+      // Add some randomness for natural positioning
+      screenX += (Random().nextDouble() - 0.5) * 20;
+      screenY += (Random().nextDouble() - 0.5) * 10;
+      
+      // Clamp to screen bounds
+      screenX = screenX.clamp(75.0, screenWidth - 75.0);
+      screenY = screenY.clamp(150.0, screenHeight - 250.0);
+      
+      bool isClaimable = distance <= boundary.radius;
+      bool isVisible = distance <= 5.0;
+      
+      newElements.add(ARElement(
+        boundary: boundary,
+        screenX: screenX,
+        screenY: screenY,
+        distance: distance,
+        isClaimable: isClaimable,
+        isVisible: isVisible,
+      ));
+    }
+    
+    setState(() {
+      arElements = newElements;
+    });
+  }
+
+  double _calculateBearing(double lat1, double lon1, double lat2, double lon2) {
+    double dLon = (lon2 - lon1) * pi / 180;
+    double lat1Rad = lat1 * pi / 180;
+    double lat2Rad = lat2 * pi / 180;
+    
+    double y = sin(dLon) * cos(lat2Rad);
+    double x = cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(dLon);
+    
+    double bearing = atan2(y, x) * 180 / pi;
+    return (bearing + 360) % 360;
+  }
+
   Future<void> _loadEventData() async {
     try {
       setState(() => isLoading = true);
@@ -109,7 +251,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         // Log boundary details for debugging
         for (int i = 0; i < boundaries.length; i++) {
           final boundary = boundaries[i];
-          print('Boundary $i: ${boundary.name} at ${boundary.latitude}, ${boundary.longitude} (radius: ${boundary.radius}m)');
+          print('Boundary $i: ${boundary.name} at ${boundary.latitude}, ${boundary.longitude} (radius: ${boundary.radius}m, claimed: ${boundary.isClaimed})');
         }
         
         // Set event in AR service
@@ -120,6 +262,9 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         arService.onBoundaryClaimed = _onBoundaryClaimed;
         arService.onProximityUpdate = _onProximityUpdate;
         arService.onProgressUpdate = _onProgressUpdate;
+        arService.onVisibleBoundariesUpdate = _onVisibleBoundariesUpdate;
+        arService.onClaimedBoundariesUpdate = _onClaimedBoundariesUpdate;
+        arService.onPositionUpdate = _onPositionUpdate;
         
         // Initialize AR service
         await arService.initializeAR();
@@ -179,6 +324,27 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     });
   }
 
+  void _onVisibleBoundariesUpdate(List<Boundary> visible) {
+    setState(() {
+      visibleBoundaries = visible;
+    });
+  }
+
+  void _onClaimedBoundariesUpdate(List<Boundary> claimed) {
+    setState(() {
+      claimedBoundaries = claimed;
+      claimedCount = claimed.length;
+    });
+  }
+
+  void _onPositionUpdate(Position position) {
+    setState(() {
+      _currentLatitude = position.latitude;
+      _currentLongitude = position.longitude;
+    });
+    _updateARPositions();
+  }
+
   void _showClaimSuccessDialog(Boundary boundary) {
     showDialog(
       context: context,
@@ -201,10 +367,18 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             const SizedBox(height: 8),
             Text(boundary.description),
             const SizedBox(height: 16),
-            Lottie.asset(
-              'assets/animations/success.json',
-              height: 100,
-              repeat: false,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.check_circle,
+                color: AppTheme.primaryColor,
+                size: 40,
+              ),
             ),
           ],
         ),
@@ -214,6 +388,73 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             child: const Text('Continue Exploring'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNFTImage(String imageUrl) {
+    // Handle different image URL types
+    if (imageUrl.startsWith('http')) {
+      // Network image
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: Colors.grey[300],
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultNFTImage();
+        },
+      );
+    } else if (imageUrl.startsWith('/')) {
+      // File path
+      return Image.file(
+        File(imageUrl),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultNFTImage();
+        },
+      );
+    } else {
+      // Asset or default
+      return _buildDefaultNFTImage();
+    }
+  }
+
+  Widget _buildDefaultNFTImage() {
+    return Container(
+      color: AppTheme.primaryColor.withOpacity(0.1),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image,
+              color: AppTheme.primaryColor,
+              size: 40,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'NFT',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -234,8 +475,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
               ),
             ),
           
-          // AR Overlay
-          if (detectedBoundary != null) _buildAROverlay(),
+          // AR Overlay for Positioned NFT Elements
+          _buildPositionedAROverlay(),
           
           // Top UI Overlay
           _buildTopOverlay(),
@@ -264,83 +505,120 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  Widget _buildAROverlay() {
-    return GestureDetector(
-      onTap: () {
-        if (detectedBoundary != null) {
-          arService.claimBoundary(detectedBoundary!);
-        }
-      },
-      child: Container(
-        color: Colors.transparent,
-        child: Center(
-          child: AnimatedBuilder(
-            animation: pulseAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: pulseAnimation.value,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppTheme.primaryColor,
-                      width: 4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryColor.withOpacity(0.5),
-                        blurRadius: 20,
-                        spreadRadius: 5,
+  Widget _buildPositionedAROverlay() {
+    return Stack(
+      children: arElements.map((element) {
+        if (!element.isVisible) return const SizedBox.shrink();
+        
+        return Positioned(
+          left: element.screenX - 75, // Center the element
+          top: element.screenY - 75,
+          child: GestureDetector(
+            onTap: () {
+              if (element.isClaimable) {
+                arService.claimBoundary(element.boundary);
+              }
+            },
+            child: AnimatedBuilder(
+              animation: element.isClaimable ? pulseAnimation : bounceAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: element.isClaimable ? pulseAnimation.value : bounceAnimation.value,
+                  child: Column(
+                    children: [
+                      // NFT Image Container
+                      Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
+                            width: 4,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.5),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: _buildNFTImage(element.boundary.imageUrl),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Distance and Status Text
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              element.isClaimable ? 'CLAIM' : 'GET CLOSER',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '${element.distance.toStringAsFixed(1)}m',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.touch_app,
-                          color: AppTheme.primaryColor,
-                          size: 48,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'TAP TO CLAIM!',
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-      ),
+        );
+      }).toList(),
     );
   }
+
+
 
   Widget _buildTopOverlay() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             // Header
             Row(
               children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black54,
-                    shape: const CircleBorder(),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      // Stop AR service and go back
+                      arService.dispose();
+                      context.go('/wallet/options');
+                    },
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -358,23 +636,56 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: () => setState(() => showClaimedBoundaries = !showClaimedBoundaries),
-                  icon: Icon(
-                    showClaimedBoundaries ? Icons.explore : Icons.list,
-                    color: Colors.white,
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black54,
-                    shape: const CircleBorder(),
+                  child: IconButton(
+                    onPressed: _showEventInfo,
+                    icon: const Icon(Icons.info, color: Colors.white),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
             
+            // Proximity Hint
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    proximityHint,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (arElements.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${arElements.length} NFT${arElements.length > 1 ? 's' : ''} nearby',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             
             // Progress Bar
@@ -429,129 +740,56 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withOpacity(0.8),
+              Colors.black.withOpacity(0.7),
             ],
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Proximity Hint
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedBuilder(
-                    animation: pulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: pulseAnimation.value,
-                        child: Icon(
-                          Icons.location_on,
-                          color: AppTheme.primaryColor,
-                          size: 20,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      proximityHint,
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
+        child: SafeArea(
+          child: Row(
+            children: [
+              // Claimed Boundaries Button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showClaimedBoundaries,
+                  icon: const Icon(Icons.celebration),
+                  label: Text('Claimed ($claimedCount)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Action Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildActionButton(
-                  icon: Icons.my_location,
-                  label: 'My Location',
-                  onTap: _showMyLocation,
+              const SizedBox(width: 12),
+              
+              // Event Info Button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showEventInfo,
+                  icon: const Icon(Icons.info),
+                  label: const Text('Event Info'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                _buildActionButton(
-                  icon: Icons.list,
-                  label: 'Claimed (${claimedBoundaries.length})',
-                  onTap: _showClaimedBoundaries,
-                ),
-                _buildActionButton(
-                  icon: Icons.info,
-                  label: 'Event Info',
-                  onTap: _showEventInfo,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppTheme.primaryColor, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -559,102 +797,35 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
 
   Widget _buildLoadingOverlay() {
     return Container(
-      color: Colors.black.withOpacity(0.8),
+      color: Colors.black87,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Lottie.asset(
-              'assets/animations/loading.json',
-              height: 100,
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Text(
-              'Loading AR Experience...',
+              'Loading Event...',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Event Code: ${widget.eventCode}',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  void _showMyLocation() {
-    final position = arService.currentPosition;
-    if (position != null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('My Location'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Latitude: ${position.latitude.toStringAsFixed(6)}'),
-              Text('Longitude: ${position.longitude.toStringAsFixed(6)}'),
-              Text('Accuracy: ${position.accuracy.toStringAsFixed(1)}m'),
-              const SizedBox(height: 16),
-              if (currentEvent != null) ...[
-                const Text('Event Location:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('Latitude: ${currentEvent!.latitude.toStringAsFixed(6)}'),
-                Text('Longitude: ${currentEvent!.longitude.toStringAsFixed(6)}'),
-                const SizedBox(height: 8),
-                Text('Distance to event center: ${_calculateDistance(
-                  position.latitude, 
-                  position.longitude, 
-                  currentEvent!.latitude, 
-                  currentEvent!.longitude
-                ).toStringAsFixed(1)}m'),
-              ],
-              if (boundaries.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('Boundary Distances:', style: TextStyle(fontWeight: FontWeight.bold)),
-                ...boundaries.take(3).map((boundary) => Text(
-                  '${boundary.name}: ${_calculateDistance(
-                    position.latitude, 
-                    position.longitude, 
-                    boundary.latitude, 
-                    boundary.longitude
-                  ).toStringAsFixed(1)}m (radius: ${boundary.radius}m)'
-                )),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location not available. Please check location permissions.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double earthRadius = 6371000; // Earth's radius in meters
-    
-    double lat1Rad = lat1 * (pi / 180);
-    double lat2Rad = lat2 * (pi / 180);
-    double deltaLat = (lat2 - lat1) * (pi / 180);
-    double deltaLon = (lon2 - lon1) * (pi / 180);
-
-    double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
-        cos(lat1Rad) * cos(lat2Rad) * sin(deltaLon / 2) * sin(deltaLon / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    return earthRadius * c;
   }
 
   void _showClaimedBoundaries() {
@@ -673,7 +844,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: Colors.green,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Row(
@@ -698,7 +869,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.explore_outlined,
+                            Icons.explore,
                             size: 64,
                             color: Colors.grey[400],
                           ),
@@ -706,16 +877,17 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                           Text(
                             'No boundaries claimed yet',
                             style: TextStyle(
+                              fontSize: 18,
                               color: Colors.grey[600],
-                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Start exploring to find and claim boundaries!',
+                            'Explore the event area to find and claim boundaries',
                             style: TextStyle(
-                              color: Colors.grey[500],
                               fontSize: 14,
+                              color: Colors.grey[500],
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -731,7 +903,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: AppTheme.primaryColor,
+                              backgroundColor: Colors.green,
                               child: Icon(
                                 Icons.check,
                                 color: Colors.white,
@@ -767,75 +939,87 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       );
       return;
     }
-    
-    showDialog(
+
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
           children: [
-            Icon(Icons.event, color: AppTheme.primaryColor),
-            const SizedBox(width: 8),
-            Expanded(child: Text(currentEvent!.name)),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.event, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Event Information',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow('Event Name', currentEvent!.name),
+                    _buildInfoRow('Description', currentEvent!.description),
+                    _buildInfoRow('Venue', currentEvent!.venueName),
+                    _buildInfoRow('Total Boundaries', '${currentEvent!.boundaries.length}'),
+                    _buildInfoRow('Claimed Boundaries', '$claimedCount'),
+                    _buildInfoRow('Event Code', currentEvent!.eventCode),
+                    if (currentEvent!.startDate != null)
+                      _buildInfoRow('Start Date', currentEvent!.startDate.toString().substring(0, 16)),
+                    if (currentEvent!.endDate != null)
+                      _buildInfoRow('End Date', currentEvent!.endDate.toString().substring(0, 16)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (currentEvent!.description.isNotEmpty) ...[
-                Text(
-                  currentEvent!.description,
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildInfoRow('Venue', currentEvent!.venueName),
-              _buildInfoRow('Event Code', currentEvent!.eventCode),
-              _buildInfoRow('Total Boundaries', '$totalBoundaries'),
-              _buildInfoRow('Claimed', '$claimedCount'),
-              _buildInfoRow('Event Center', '${currentEvent!.latitude.toStringAsFixed(6)}, ${currentEvent!.longitude.toStringAsFixed(6)}'),
-              if (currentEvent!.startDate != null)
-                _buildInfoRow('Start Date', currentEvent!.startDate!.toString().substring(0, 16)),
-              if (currentEvent!.endDate != null)
-                _buildInfoRow('End Date', currentEvent!.endDate!.toString().substring(0, 16)),
-              const SizedBox(height: 16),
-              if (boundaries.isNotEmpty) ...[
-                const Text('Boundaries:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                ...boundaries.map((boundary) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• ${boundary.name} (${boundary.radius}m radius)'),
-                )),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
           ),
-          Expanded(
-            child: Text(value),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -846,8 +1030,10 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   void dispose() {
     confettiController.dispose();
     pulseController.dispose();
-    arService.dispose();
+    bounceController.dispose();
     _cameraController?.dispose();
+    arService.dispose();
     super.dispose();
   }
 }
+

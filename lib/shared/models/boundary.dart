@@ -17,6 +17,12 @@ class Boundary {
   final Vector3 position; // AR position
   final Vector3 rotation; // AR rotation
   final Vector3 scale; // AR scale
+  // New fields for enhanced boundary management
+  final String? nftTokenId;
+  final Map<String, dynamic>? nftMetadata;
+  final double claimProgress;
+  final int? lastNotificationDistance;
+  final bool isVisible;
 
   Boundary({
     String? id,
@@ -33,6 +39,11 @@ class Boundary {
     Vector3? position,
     Vector3? rotation,
     Vector3? scale,
+    this.nftTokenId,
+    this.nftMetadata,
+    this.claimProgress = 0.0,
+    this.lastNotificationDistance,
+    this.isVisible = true,
   }) : 
     id = id ?? const Uuid().v4(),
     position = position ?? Vector3(0, 0, -2),
@@ -54,6 +65,11 @@ class Boundary {
     Vector3? position,
     Vector3? rotation,
     Vector3? scale,
+    String? nftTokenId,
+    Map<String, dynamic>? nftMetadata,
+    double? claimProgress,
+    int? lastNotificationDistance,
+    bool? isVisible,
   }) {
     return Boundary(
       id: id ?? this.id,
@@ -70,6 +86,11 @@ class Boundary {
       position: position ?? this.position,
       rotation: rotation ?? this.rotation,
       scale: scale ?? this.scale,
+      nftTokenId: nftTokenId ?? this.nftTokenId,
+      nftMetadata: nftMetadata ?? this.nftMetadata,
+      claimProgress: claimProgress ?? this.claimProgress,
+      lastNotificationDistance: lastNotificationDistance ?? this.lastNotificationDistance,
+      isVisible: isVisible ?? this.isVisible,
     );
   }
 
@@ -78,6 +99,25 @@ class Boundary {
       isClaimed: true,
       claimedBy: walletAddress,
       claimedAt: DateTime.now(),
+      claimProgress: 100.0,
+    );
+  }
+
+  Boundary updateProgress(double progress) {
+    return copyWith(
+      claimProgress: progress.clamp(0.0, 100.0),
+    );
+  }
+
+  Boundary updateNotificationDistance(int distance) {
+    return copyWith(
+      lastNotificationDistance: distance,
+    );
+  }
+
+  Boundary updateVisibility(bool visible) {
+    return copyWith(
+      isVisible: visible,
     );
   }
 
@@ -102,20 +142,62 @@ class Boundary {
     return distanceFrom(userLat, userLng) <= radius;
   }
 
+  // Check if boundary should be visible (within 5 meters)
+  bool shouldBeVisible(double userLat, double userLng) {
+    return distanceFrom(userLat, userLng) <= 5.0;
+  }
+
   // Get proximity hint (how close user is)
   String getProximityHint(double userLat, double userLng) {
     double distance = distanceFrom(userLat, userLng);
     
     if (distance <= radius) {
       return "You're here! Tap to claim!";
-    } else if (distance <= radius * 2) {
-      return "Very close! Keep moving...";
-    } else if (distance <= radius * 5) {
-      return "Getting warmer...";
-    } else if (distance <= radius * 10) {
+    } else if (distance <= 5.0) {
+      return "Getting closer! Move within 2m to claim.";
+    } else if (distance <= 10.0) {
       return "You're in the right area!";
-    } else {
+    } else if (distance <= 20.0) {
+      return "Getting warmer...";
+    } else if (distance <= 50.0) {
       return "Keep exploring the event area";
+    } else {
+      return "Explore to find NFT boundaries";
+    }
+  }
+
+  // Get notification message based on distance
+  String? getNotificationMessage(double userLat, double userLng, List<int> notificationDistances) {
+    double distance = distanceFrom(userLat, userLng);
+    
+    for (int notificationDistance in notificationDistances) {
+      if (distance <= notificationDistance && lastNotificationDistance != notificationDistance) {
+        if (notificationDistance <= 5) {
+          return "You're very close to a boundary! Only ${notificationDistance}m away!";
+        } else if (notificationDistance <= 20) {
+          return "Getting closer! You're ${notificationDistance}m from a boundary.";
+        } else {
+          return "You're ${notificationDistance}m away from a boundary. Keep exploring!";
+        }
+      }
+    }
+    return null;
+  }
+
+  // Calculate progress percentage based on distance
+  double calculateProgress(double userLat, double userLng) {
+    double distance = distanceFrom(userLat, userLng);
+    
+    if (distance <= radius) {
+      return 100.0;
+    } else if (distance <= 10.0) {
+      return 80.0;
+    } else if (distance <= 50.0) {
+      return 60.0;
+    } else if (distance <= 100.0) {
+      return 40.0;
+    } else {
+      return 20.0;
     }
   }
 
@@ -124,25 +206,30 @@ class Boundary {
       'id': id,
       'name': name,
       'description': description,
-      'imageUrl': imageUrl,
+      'image_url': imageUrl,
       'latitude': latitude,
       'longitude': longitude,
       'radius': radius,
-      'isClaimed': isClaimed,
-      'claimedBy': claimedBy,
-      'claimedAt': claimedAt?.toIso8601String(),
-      'eventId': eventId,
-      'position': {
+      'is_claimed': isClaimed,
+      'claimed_by': claimedBy,
+      'claimed_at': claimedAt?.toIso8601String(),
+      'event_id': eventId,
+      'nft_token_id': nftTokenId,
+      'nft_metadata': nftMetadata,
+      'claim_progress': claimProgress,
+      'last_notification_distance': lastNotificationDistance,
+      'is_visible': isVisible,
+      'ar_position': {
         'x': position.x,
         'y': position.y,
         'z': position.z,
       },
-      'rotation': {
+      'ar_rotation': {
         'x': rotation.x,
         'y': rotation.y,
         'z': rotation.z,
       },
-      'scale': {
+      'ar_scale': {
         'x': scale.x,
         'y': scale.y,
         'z': scale.z,
@@ -152,22 +239,28 @@ class Boundary {
 
   factory Boundary.fromJson(Map<String, dynamic> json) {
     // Handle both old format (individual columns) and new format (JSONB)
-    Map<String, dynamic>? positionData = json['position'];
-    Map<String, dynamic>? rotationData = json['rotation'];
-    Map<String, dynamic>? scaleData = json['scale'];
+    Map<String, dynamic>? positionData = json['ar_position'] ?? json['position'];
+    Map<String, dynamic>? rotationData = json['ar_rotation'] ?? json['rotation'];
+    Map<String, dynamic>? scaleData = json['ar_scale'] ?? json['scale'];
     
     return Boundary(
       id: json['id'],
       name: json['name'],
       description: json['description'],
-      imageUrl: json['imageUrl'],
+      imageUrl: json['image_url'] ?? json['imageUrl'],
       latitude: json['latitude'].toDouble(),
       longitude: json['longitude'].toDouble(),
       radius: json['radius']?.toDouble() ?? 2.0,
-      isClaimed: json['isClaimed'] ?? false,
-      claimedBy: json['claimedBy'],
-      claimedAt: json['claimedAt'] != null ? DateTime.parse(json['claimedAt']) : null,
-      eventId: json['eventId'],
+      isClaimed: json['is_claimed'] ?? json['isClaimed'] ?? false,
+      claimedBy: json['claimed_by'] ?? json['claimedBy'],
+      claimedAt: json['claimed_at'] != null ? DateTime.parse(json['claimed_at']) : 
+                 json['claimedAt'] != null ? DateTime.parse(json['claimedAt']) : null,
+      eventId: json['event_id'] ?? json['eventId'],
+      nftTokenId: json['nft_token_id'] ?? json['nftTokenId'],
+      nftMetadata: json['nft_metadata'] ?? json['nftMetadata'],
+      claimProgress: json['claim_progress']?.toDouble() ?? json['claimProgress']?.toDouble() ?? 0.0,
+      lastNotificationDistance: json['last_notification_distance'] ?? json['lastNotificationDistance'],
+      isVisible: json['is_visible'] ?? json['isVisible'] ?? true,
       position: Vector3(
         positionData?['x']?.toDouble() ?? json['position_x']?.toDouble() ?? 0.0,
         positionData?['y']?.toDouble() ?? json['position_y']?.toDouble() ?? 0.0,

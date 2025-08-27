@@ -72,6 +72,7 @@ dependencies:
   http: ^1.2.1
   connectivity_plus: ^5.0.2
   go_router: ^14.2.7
+  flutter_local_notifications: ^17.2.2
 
   # Icons and UI
   cupertino_icons: ^1.0.8

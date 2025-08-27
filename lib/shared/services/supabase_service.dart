@@ -14,6 +14,13 @@ class SupabaseService {
 
   Future<void> initialize() async {
     try {
+      // Check if already initialized
+      if (Supabase.instance.client != null) {
+        _client = Supabase.instance.client;
+        print('Supabase already initialized, using existing client');
+        return;
+      }
+      
       await Supabase.initialize(
         url: 'https://kkzgqrjgjcusmdivvbmj.supabase.co',
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtremdxcmpnamN1c21kaXZ2Ym1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg1NzEsImV4cCI6MjA3MTcwNDU3MX0.g82dcf0a2dS0aFEMigp_cpPZlDwRbmOKtuGoXuf0dEA',
@@ -69,89 +76,61 @@ class SupabaseService {
 
   Future<Event> createEvent(Event event) async {
     try {
-      // Check if Supabase is initialized
-      if (_client == null) {
-        throw Exception('Supabase client not initialized');
-      }
-      
-      // Test connection first
-      await _client.from('events').select('count').limit(1);
-      
-      // Try to create event with retry logic for duplicate event codes
-      Event? createdEvent;
-      int retryCount = 0;
-      const maxRetries = 3;
-      
-      while (retryCount < maxRetries) {
-        try {
-          // Create event data without boundaries and goodies
-          final eventData = {
-            'id': event.id,
-            'name': event.name,
-            'description': event.description ?? '',
-            'organizer_wallet_address': event.organizerWalletAddress,
-            'created_at': event.createdAt.toIso8601String(),
-            'start_date': event.startDate?.toIso8601String(),
-            'end_date': event.endDate?.toIso8601String(),
-            'latitude': event.latitude,
-            'longitude': event.longitude,
-            'venue_name': event.venueName,
-            'event_code': event.eventCode,
-          };
-          
-          final response = await _client
-              .from('events')
-              .insert(eventData)
-              .select()
-              .single();
-          
-          createdEvent = Event.fromJson(response);
-          break; // Success, exit the retry loop
-          
-        } catch (e) {
-          // Check if it's a duplicate event code error
-          if (e.toString().contains('duplicate key value violates unique constraint') && 
-              e.toString().contains('events_event_code_key')) {
-            retryCount++;
-            if (retryCount >= maxRetries) {
-              throw Exception('Failed to generate unique event code after $maxRetries attempts. Please try again.');
-            }
-            
-            // Generate a new event code and try again
-            final newEventCode = _generateUniqueEventCode();
-            event = event.copyWith(eventCode: newEventCode);
-            print('Retrying with new event code: $newEventCode (attempt $retryCount)');
-            continue;
-          } else {
-            // It's not a duplicate event code error, rethrow
-            rethrow;
-          }
-        }
-      }
+      // First create the event
+      final eventData = {
+        'id': event.id,
+        'name': event.name,
+        'description': event.description,
+        'organizer_wallet_address': event.organizerWalletAddress,
+        'latitude': event.latitude,
+        'longitude': event.longitude,
+        'venue_name': event.venueName,
+        'event_code': event.eventCode,
+        'start_date': event.startDate?.toIso8601String(),
+        'end_date': event.endDate?.toIso8601String(),
+        'nft_supply_count': event.nftSupplyCount,
+        'event_image_url': event.eventImageUrl,
+        'boundary_description': event.boundaryDescription,
+        'notification_distances': event.notificationDistances,
+        'visibility_radius': event.visibilityRadius,
+      };
+
+      final createdEventResponse = await _client
+          .from('events')
+          .insert(eventData)
+          .select()
+          .single();
+
+      final createdEvent = Event.fromJson(createdEventResponse);
       
       // Now create boundaries separately
-      if (createdEvent != null) {
+      if (event.boundaries.isNotEmpty) {
         for (var boundary in event.boundaries) {
           final boundaryData = {
             'id': boundary.id,
             'name': boundary.name,
-            'description': boundary.description ?? '',
+            'description': boundary.description,
             'image_url': boundary.imageUrl,
             'latitude': boundary.latitude,
             'longitude': boundary.longitude,
             'radius': boundary.radius,
             'event_id': createdEvent.id,
-            'position': {
+            'nft_token_id': boundary.nftTokenId,
+            'nft_metadata': boundary.nftMetadata,
+            'claim_progress': boundary.claimProgress,
+            'last_notification_distance': boundary.lastNotificationDistance,
+            'is_visible': boundary.isVisible,
+            'ar_position': {
               'x': boundary.position.x,
               'y': boundary.position.y,
               'z': boundary.position.z,
             },
-            'rotation': {
+            'ar_rotation': {
               'x': boundary.rotation.x,
               'y': boundary.rotation.y,
               'z': boundary.rotation.z,
             },
-            'scale': {
+            'ar_scale': {
               'x': boundary.scale.x,
               'y': boundary.scale.y,
               'z': boundary.scale.z,
@@ -159,11 +138,9 @@ class SupabaseService {
           };
           await _client.from('boundaries').insert(boundaryData);
         }
-        
-        return createdEvent;
-      } else {
-        throw Exception('Failed to create event after retries');
       }
+      
+      return createdEvent;
     } catch (e) {
       print('Error creating event: $e');
       if (e.toString().contains('relation "events" does not exist')) {
@@ -237,11 +214,53 @@ class SupabaseService {
             'is_claimed': true,
             'claimed_by': walletAddress,
             'claimed_at': DateTime.now().toIso8601String(),
+            'claim_progress': 100.0,
           })
           .eq('id', boundaryId);
     } catch (e) {
       print('Error claiming boundary: $e');
       rethrow;
+    }
+  }
+
+  // New method to get nearby boundaries with progress
+  Future<List<Map<String, dynamic>>> getNearbyBoundaries(
+    double userLat, 
+    double userLon, 
+    String userWallet,
+    {double maxDistance = 1000.0}
+  ) async {
+    try {
+      final response = await _client
+          .rpc('get_nearby_boundaries', params: {
+            'user_lat': userLat,
+            'user_lon': userLon,
+            'user_wallet': userWallet,
+            'max_distance': maxDistance,
+          });
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error fetching nearby boundaries: $e');
+      return [];
+    }
+  }
+
+  // New method to update boundary visibility
+  Future<void> updateBoundaryVisibility(
+    double userLat, 
+    double userLon, 
+    String userWallet
+  ) async {
+    try {
+      await _client
+          .rpc('update_boundary_visibility', params: {
+            'user_lat': userLat,
+            'user_lon': userLon,
+            'user_wallet': userWallet,
+          });
+    } catch (e) {
+      print('Error updating boundary visibility: $e');
     }
   }
 
@@ -259,6 +278,47 @@ class SupabaseService {
     } catch (e) {
       print('Error fetching user claimed boundaries: $e');
       return [];
+    }
+  }
+
+  // Get event statistics
+  Future<Map<String, dynamic>?> getEventStatistics(String eventId) async {
+    try {
+      final response = await _client
+          .from('event_statistics')
+          .select('*')
+          .eq('event_id', eventId)
+          .single();
+      
+      return response;
+    } catch (e) {
+      print('Error fetching event statistics: $e');
+      return null;
+    }
+  }
+
+  // Log user proximity for analytics
+  Future<void> logUserProximity({
+    required String userWalletAddress,
+    required String boundaryId,
+    required String eventId,
+    required double distanceMeters,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      await _client
+          .from('user_proximity_logs')
+          .insert({
+            'user_wallet_address': userWalletAddress,
+            'boundary_id': boundaryId,
+            'event_id': eventId,
+            'distance_meters': distanceMeters,
+            'latitude': latitude,
+            'longitude': longitude,
+          });
+    } catch (e) {
+      print('Error logging user proximity: $e');
     }
   }
 
