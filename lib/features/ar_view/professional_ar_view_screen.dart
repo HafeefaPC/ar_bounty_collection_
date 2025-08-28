@@ -6,7 +6,6 @@ import 'package:camera/camera.dart';
 import 'package:confetti/confetti.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:go_router/go_router.dart';
 import '../../../shared/services/ar_service.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
@@ -14,77 +13,87 @@ import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../core/theme/app_theme.dart';
 
-// AR Element class for positioning NFT images in 3D space
-class ARElement {
+// Professional AR Element class
+class ProfessionalARElement {
   final Boundary boundary;
   final double screenX;
   final double screenY;
   final double distance;
   final bool isClaimable;
   final bool isVisible;
+  final bool isClaimed;
+  final String claimStatus;
+  final double progressPercentage;
 
-  ARElement({
+  ProfessionalARElement({
     required this.boundary,
     required this.screenX,
     required this.screenY,
     required this.distance,
     required this.isClaimable,
     required this.isVisible,
+    required this.isClaimed,
+    required this.claimStatus,
+    required this.progressPercentage,
   });
 }
 
-class ARViewScreen extends ConsumerStatefulWidget {
+class ProfessionalARViewScreen extends ConsumerStatefulWidget {
   final String eventCode;
 
-  const ARViewScreen({super.key, required this.eventCode});
+  const ProfessionalARViewScreen({super.key, required this.eventCode});
 
   @override
-  ConsumerState<ARViewScreen> createState() => _ARViewScreenState();
+  ConsumerState<ProfessionalARViewScreen> createState() => _ProfessionalARViewScreenState();
 }
 
-class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProviderStateMixin {
+class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScreen> with TickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   
   late ARService arService;
   late SupabaseService supabaseService;
+  late WalletService walletService;
 
   Event? currentEvent;
-  List<Boundary> boundaries = [];
-  List<Boundary> claimedBoundaries = [];
-  List<Boundary> visibleBoundaries = [];
+  List<Boundary> allBoundaries = [];
+  List<Boundary> userClaimedBoundaries = [];
+  List<ProfessionalARElement> visibleARElements = [];
 
   // UI State
   bool isLoading = true;
   bool isCameraInitialized = false;
-  String proximityHint = "Initializing camera...";
-  int claimedCount = 0;
+  String proximityHint = "Initializing AR experience...";
+  int userClaimedCount = 0;
   int totalBoundaries = 0;
-  bool showClaimedBoundaries = false;
+  int eventClaimedCount = 0;
   Boundary? detectedBoundary;
 
   // AR Positioning and Sensors
   double? _currentLatitude;
   double? _currentLongitude;
-  double _deviceAzimuth = 0.0; // Device heading in degrees
-  double _devicePitch = 0.0;   // Device pitch in degrees
-  double _deviceRoll = 0.0;    // Device roll in degrees
+  double _deviceAzimuth = 0.0;
+  double _devicePitch = 0.0;
+  double _deviceRoll = 0.0;
   
-  // AR Elements positioning
-  List<ARElement> arElements = [];
+  // Configurable settings
+  double _visibilityRadius = 2.0; // Default 2 meters
+  double _notificationDistance = 5.0; // Show notifications within 5 meters
   
-  // Animations
+  // Professional Animations
   late ConfettiController confettiController;
-  late AnimationController pulseController;
-  late Animation<double> pulseAnimation;
   late AnimationController rotationController;
   late Animation<double> rotationAnimation;
+  late AnimationController glowController;
+  late Animation<double> glowAnimation;
+  late AnimationController pulseController;
+  late Animation<double> pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     _initializeServices();
-    _setupAnimations();
+    _setupProfessionalAnimations();
     _loadEventData();
     _initializeCamera();
     _initializeSensors();
@@ -93,12 +102,13 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   void _initializeServices() {
     arService = ARService();
     supabaseService = SupabaseService();
+    walletService = WalletService();
   }
 
-  void _setupAnimations() {
+  void _setupProfessionalAnimations() {
     confettiController = ConfettiController(duration: const Duration(seconds: 3));
     
-    // Smooth rotation animation for NFT images (instead of bouncing)
+    // Smooth rotation animation for NFT images
     rotationController = AnimationController(
       duration: const Duration(seconds: 8), // Very slow, elegant rotation
       vsync: this,
@@ -106,17 +116,26 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     rotationAnimation = Tween<double>(begin: 0, end: 2 * pi).animate(
       CurvedAnimation(parent: rotationController, curve: Curves.linear),
     );
-    rotationController.repeat(); // Continuous rotation
+    rotationController.repeat();
 
-    // Pulse animation for claimable boundaries
-    pulseController = AnimationController(
-      duration: const Duration(seconds: 3),
+    // Subtle glow effect for claimable boundaries
+    glowController = AnimationController(
+      duration: const Duration(seconds: 4), // Gentle pulsing glow
       vsync: this,
     );
-    pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    glowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
+      CurvedAnimation(parent: glowController, curve: Curves.easeInOut),
+    );
+    glowController.repeat(reverse: true);
+
+    // Pulse animation for detected boundaries
+    pulseController = AnimationController(
+      duration: const Duration(seconds: 2), // Quick pulse for detection
+      vsync: this,
+    );
+    pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(parent: pulseController, curve: Curves.easeInOut),
     );
-    pulseController.repeat(reverse: true);
   }
 
   Future<void> _initializeCamera() async {
@@ -142,7 +161,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     // Listen to device orientation changes
     gyroscopeEvents.listen((GyroscopeEvent event) {
       setState(() {
-        _devicePitch += event.y * 0.1; // Convert to degrees
+        _devicePitch += event.y * 0.1;
         _deviceRoll += event.x * 0.1;
       });
       _updateARPositions();
@@ -150,7 +169,6 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
 
     // Listen to compass/magnetometer for heading
     magnetometerEvents.listen((MagnetometerEvent event) {
-      // Calculate azimuth from magnetometer data
       double azimuth = atan2(event.y, event.x) * 180 / pi;
       setState(() {
         _deviceAzimuth = azimuth;
@@ -160,23 +178,29 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   void _updateARPositions() {
-    if (_currentLatitude == null || _currentLongitude == null || boundaries.isEmpty) {
+    if (_currentLatitude == null || _currentLongitude == null || allBoundaries.isEmpty) {
       return;
     }
 
-    List<ARElement> newElements = [];
+    List<ProfessionalARElement> newElements = [];
     
-    for (Boundary boundary in boundaries) {
+    for (Boundary boundary in allBoundaries) {
       // Skip if already claimed by this user
-      if (claimedBoundaries.any((claimed) => claimed.id == boundary.id)) continue;
+      if (userClaimedBoundaries.any((claimed) => claimed.id == boundary.id)) {
+        continue;
+      }
       
-      // Skip if already claimed by someone else
-      if (boundary.isClaimed && boundary.claimedBy != null) continue;
+      // Skip if claimed by someone else
+      if (boundary.isClaimed) {
+        continue;
+      }
       
       double distance = boundary.distanceFrom(_currentLatitude!, _currentLongitude!);
       
-      // Only show boundaries within 2 meters (configurable)
-      if (distance > 2.0) continue;
+      // Only show boundaries within visibility radius (default 2 meters)
+      if (distance > _visibilityRadius) {
+        continue;
+      }
       
       // Calculate bearing to boundary
       double bearing = _calculateBearing(_currentLatitude!, _currentLongitude!, 
@@ -192,39 +216,57 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       // Only show if within 90 degrees of device heading (field of view)
       if (relativeAngle.abs() > 90) continue;
       
-      // Convert to screen coordinates (improved 3D projection)
+      // Convert to screen coordinates
       double screenWidth = MediaQuery.of(context).size.width;
       double screenHeight = MediaQuery.of(context).size.height;
       
-      // Map angle to screen X position (center is 0 degrees)
+      // Map angle to screen X position
       double screenX = screenWidth / 2 + (relativeAngle * screenWidth / 180);
       
-      // Map distance to screen Y position (closer = higher on screen)
-      double screenY = screenHeight * 0.3 + (distance * 20); // Closer objects appear higher
+      // Map distance to screen Y position with depth perception
+      double depthFactor = 1.0 - (distance / _visibilityRadius).clamp(0.0, 1.0);
+      double screenY = screenHeight * 0.2 + (distance * 15) - (depthFactor * 50);
       
-      // Add some randomness for natural positioning
-      screenX += (Random().nextDouble() - 0.5) * 20;
-      screenY += (Random().nextDouble() - 0.5) * 10;
+      // Add minimal randomness for natural positioning
+      screenX += (Random().nextDouble() - 0.5) * 10;
+      screenY += (Random().nextDouble() - 0.5) * 5;
       
       // Clamp to screen bounds
       screenX = screenX.clamp(75.0, screenWidth - 75.0);
       screenY = screenY.clamp(150.0, screenHeight - 250.0);
       
       bool isClaimable = distance <= boundary.radius;
-      bool isVisible = distance <= 5.0;
+      bool isVisible = distance <= _visibilityRadius;
+      bool isClaimed = boundary.isClaimed;
       
-      newElements.add(ARElement(
+      // Determine claim status
+      String claimStatus;
+      if (isClaimed) {
+        claimStatus = "ALREADY CLAIMED";
+      } else if (isClaimable) {
+        claimStatus = "TAP TO CLAIM";
+      } else {
+        claimStatus = "GET CLOSER";
+      }
+      
+      // Calculate progress percentage
+      double progressPercentage = ((_notificationDistance - distance) / _notificationDistance * 100).clamp(0.0, 100.0);
+      
+      newElements.add(ProfessionalARElement(
         boundary: boundary,
         screenX: screenX,
         screenY: screenY,
         distance: distance,
         isClaimable: isClaimable,
         isVisible: isVisible,
+        isClaimed: isClaimed,
+        claimStatus: claimStatus,
+        progressPercentage: progressPercentage,
       ));
     }
     
     setState(() {
-      arElements = newElements;
+      visibleARElements = newElements;
     });
   }
 
@@ -251,22 +293,25 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       
       if (currentEvent != null) {
         print('Event loaded successfully: ${currentEvent!.name}');
-        print('Event ID: ${currentEvent!.id}');
-        print('Event has ${currentEvent!.boundaries.length} boundaries');
         
-        boundaries = currentEvent!.boundaries;
-        totalBoundaries = boundaries.length;
+        // Get all boundaries for this event ONLY
+        allBoundaries = currentEvent!.boundaries;
+        totalBoundaries = allBoundaries.length;
         
-        // Log boundary details for debugging
-        for (int i = 0; i < boundaries.length; i++) {
-          final boundary = boundaries[i];
-          print('Boundary $i: ${boundary.name} at ${boundary.latitude}, ${boundary.longitude} (radius: ${boundary.radius}m, claimed: ${boundary.isClaimed}, eventId: ${boundary.eventId})');
-        }
+        // Get user's claimed boundaries for this event ONLY
+        final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
+        userClaimedBoundaries = await supabaseService.getUserEventClaims(walletAddress, currentEvent!.id);
+        userClaimedCount = userClaimedBoundaries.length;
         
-        // Set event in AR service (now async)
-        await arService.setEvent(currentEvent!);
+        // Get event statistics for this event ONLY
+        final eventStats = await supabaseService.getEventStats(currentEvent!.id);
+        eventClaimedCount = eventStats['claimed_boundaries'] ?? 0;
         
-        // Set up AR service callbacks
+        // Set visibility radius from event settings
+        _visibilityRadius = currentEvent!.visibilityRadius ?? 2.0;
+        
+        // Set up AR service with event-specific data
+        arService.setEvent(currentEvent!);
         arService.onBoundaryDetected = _onBoundaryDetected;
         arService.onBoundaryClaimed = _onBoundaryClaimed;
         arService.onProximityUpdate = _onProximityUpdate;
@@ -275,12 +320,11 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         arService.onClaimedBoundariesUpdate = _onClaimedBoundariesUpdate;
         arService.onPositionUpdate = _onPositionUpdate;
         
-        // Initialize AR service
         await arService.initializeAR();
         
         setState(() {
           isLoading = false;
-          proximityHint = 'Event loaded! Exploring for boundaries...';
+          proximityHint = 'Event "${currentEvent!.name}" loaded! Exploring for boundaries...';
         });
       } else {
         print('Event not found for code: ${widget.eventCode}');
@@ -299,7 +343,6 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   void _onBoundaryDetected(Boundary boundary) {
-    if (!mounted) return;
     setState(() {
       detectedBoundary = boundary;
       proximityHint = "Boundary detected! Tap to claim!";
@@ -308,16 +351,15 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   void _onBoundaryClaimed(Boundary boundary) {
-    if (!mounted) return;
     setState(() {
-      claimedBoundaries.add(boundary);
-      claimedCount = claimedBoundaries.length;
+      userClaimedBoundaries.add(boundary);
+      userClaimedCount = userClaimedBoundaries.length;
       detectedBoundary = null;
       
       // Mark the boundary as claimed in the main boundaries list
-      final index = boundaries.indexWhere((b) => b.id == boundary.id);
+      final index = allBoundaries.indexWhere((b) => b.id == boundary.id);
       if (index != -1) {
-        boundaries[index] = boundaries[index].copyWith(isClaimed: true);
+        allBoundaries[index] = allBoundaries[index].copyWith(isClaimed: true);
       }
     });
     
@@ -332,37 +374,30 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   void _onProximityUpdate(String hint) {
-    if (!mounted) return;
     setState(() {
       proximityHint = hint;
     });
   }
 
   void _onProgressUpdate(int claimed, int total) {
-    if (!mounted) return;
     setState(() {
-      claimedCount = claimed;
+      userClaimedCount = claimed;
       totalBoundaries = total;
     });
   }
 
   void _onVisibleBoundariesUpdate(List<Boundary> visible) {
-    if (!mounted) return;
-    setState(() {
-      visibleBoundaries = visible;
-    });
+    // Not used in professional version
   }
 
   void _onClaimedBoundariesUpdate(List<Boundary> claimed) {
-    if (!mounted) return;
     setState(() {
-      claimedBoundaries = claimed;
-      claimedCount = claimed.length;
+      userClaimedBoundaries = claimed;
+      userClaimedCount = claimed.length;
     });
   }
 
   void _onPositionUpdate(Position position) {
-    if (!mounted) return;
     setState(() {
       _currentLatitude = position.latitude;
       _currentLongitude = position.longitude;
@@ -370,93 +405,31 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     _updateARPositions();
   }
 
-  // Debug method to reset boundaries for testing
-  Future<void> _resetBoundariesForTesting() async {
-    if (currentEvent == null) return;
+  Future<void> _claimBoundary(ProfessionalARElement element) async {
+    if (!element.isClaimable || element.isClaimed) return;
     
     try {
-      await supabaseService.resetEventBoundaries(currentEvent!.id);
-      
-      // Reload event data
-      await _loadEventData();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Boundaries reset successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
+      final success = await supabaseService.claimBoundaryForUser(
+        element.boundary.id,
+        walletAddress,
+        element.distance,
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error resetting boundaries: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Debug method to fix incorrectly claimed boundaries
-  Future<void> _fixIncorrectlyClaimedBoundaries() async {
-    if (currentEvent == null) return;
-    
-    try {
-      await supabaseService.fixIncorrectlyClaimedBoundaries(currentEvent!.id);
       
-      // Reload event data
-      await _loadEventData();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Incorrectly claimed boundaries fixed!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fixing boundaries: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Debug method to check boundary status
-  Future<void> _checkBoundaryStatus() async {
-    if (currentEvent == null) return;
-    
-    try {
-      final status = await supabaseService.getBoundaryStatus(currentEvent!.id);
-      
-      String message = 'Boundary Status:\n';
-      for (final boundary in status) {
-        message += '${boundary['name']}: ${boundary['is_claimed'] ? 'Claimed' : 'Available'}\n';
-        if (boundary['is_claimed'] == true) {
-          message += '  By: ${boundary['claimed_by'] ?? 'Unknown'}\n';
-          message += '  At: ${boundary['claimed_at'] ?? 'Unknown'}\n';
-        }
-      }
-      
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Boundary Status'),
-          content: SingleChildScrollView(
-            child: Text(message),
+      if (success) {
+        _onBoundaryClaimed(element.boundary);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to claim boundary. It may have been claimed by someone else.'),
+            backgroundColor: Colors.red,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error checking status: $e'),
+          content: Text('Error claiming boundary: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -472,7 +445,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
           children: [
             Icon(Icons.celebration, color: AppTheme.primaryColor),
             const SizedBox(width: 8),
-            const Text('Boundary Claimed!'),
+            const Text('Boundary Claimed! 🎉'),
           ],
         ),
         content: Column(
@@ -498,6 +471,12 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                 size: 40,
               ),
             ),
+            const SizedBox(height: 16),
+            Text(
+              'You\'ve claimed ${userClaimedCount} of $totalBoundaries boundaries in this event!',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
         actions: [
@@ -511,9 +490,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   Widget _buildNFTImage(String imageUrl) {
-    // Handle different image URL types
     if (imageUrl.startsWith('http')) {
-      // Network image
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
@@ -536,7 +513,6 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         },
       );
     } else if (imageUrl.startsWith('/')) {
-      // File path
       return Image.file(
         File(imageUrl),
         fit: BoxFit.cover,
@@ -545,7 +521,6 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         },
       );
     } else {
-      // Asset or default
       return _buildDefaultNFTImage();
     }
   }
@@ -593,8 +568,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
               ),
             ),
           
-          // AR Overlay for Positioned NFT Elements
-          _buildPositionedAROverlay(),
+          // Professional AR Overlay
+          _buildProfessionalAROverlay(),
           
           // Top UI Overlay
           _buildTopOverlay(),
@@ -623,116 +598,102 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  Widget _buildPositionedAROverlay() {
+  Widget _buildProfessionalAROverlay() {
     return Stack(
-      children: arElements.map((element) {
+      children: visibleARElements.map((element) {
         if (!element.isVisible) return const SizedBox.shrink();
         
         return Positioned(
-          left: element.screenX - 75, // Center the element
+          left: element.screenX - 75,
           top: element.screenY - 75,
           child: GestureDetector(
-            onTap: () async {
-              if (element.isClaimable) {
-                try {
-                  final walletService = WalletService();
-                  final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
-                  
-                  final success = await supabaseService.claimBoundaryForUser(
-                    element.boundary.id,
-                    walletAddress,
-                    element.distance,
-                  );
-                  
-                  if (success) {
-                    arService.claimBoundary(element.boundary);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to claim boundary. It may have been claimed by someone else.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error claiming boundary: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
+            onTap: () => _claimBoundary(element),
             child: AnimatedBuilder(
-              animation: element.isClaimable ? pulseAnimation : rotationAnimation,
+              animation: element.isClaimable ? glowAnimation : rotationAnimation,
               builder: (context, child) {
-                return Transform.rotate(
-                  angle: element.isClaimable ? 0 : rotationAnimation.value,
-                  child: Transform.scale(
-                    scale: element.isClaimable ? pulseAnimation.value : 1.0,
-                    child: Column(
-                      children: [
-                        // NFT Image Container
-                        Container(
-                          width: 150,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
-                              width: 4,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.5),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: _buildNFTImage(element.boundary.imageUrl),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Distance and Status Text
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
+                return Transform.scale(
+                  scale: element.isClaimable ? 1.0 + (glowAnimation.value * 0.1) : 1.0,
+                  child: Column(
+                    children: [
+                      // NFT Image Container with professional 3D effects
+                      Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
                             color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                            width: 4,
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                element.isClaimable ? 'CLAIM' : 'GET CLOSER',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '${element.distance.toStringAsFixed(1)}m',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.5),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                        child: ClipOval(
+                          child: element.isClaimable 
+                            ? AnimatedBuilder(
+                                animation: rotationAnimation,
+                                builder: (context, child) {
+                                  return Transform.rotate(
+                                    angle: rotationAnimation.value,
+                                    child: _buildNFTImage(element.boundary.imageUrl),
+                                  );
+                                },
+                              )
+                            : _buildNFTImage(element.boundary.imageUrl),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Professional Status Display
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              element.claimStatus,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '${element.distance.toStringAsFixed(1)}m',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (!element.isClaimable && !element.isClaimed) ...[
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(
+                                value: element.progressPercentage / 100,
+                                backgroundColor: Colors.white.withOpacity(0.3),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                minHeight: 2,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -743,15 +704,13 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-
-
   Widget _buildTopOverlay() {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Header
+            // Professional Header with working back button
             Row(
               children: [
                 Container(
@@ -760,14 +719,14 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                                      child: IconButton(
-                      onPressed: () {
-                        // Stop AR service and go back
-                        arService.dispose();
-                        context.go('/wallet/options');
-                      },
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
+                  child: IconButton(
+                    onPressed: () {
+                      // Stop AR service and navigate back properly
+                      arService.dispose();
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -804,7 +763,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             ),
             const SizedBox(height: 16),
             
-            // Proximity Hint
+            // Professional Proximity Hint
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -821,10 +780,10 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  if (arElements.isNotEmpty) ...[
+                  if (visibleARElements.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${arElements.length} NFT${arElements.length > 1 ? 's' : ''} nearby',
+                      '${visibleARElements.length} NFT${visibleARElements.length > 1 ? 's' : ''} within ${_visibilityRadius.toStringAsFixed(1)}m',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -836,7 +795,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             ),
             const SizedBox(height: 16),
             
-            // Progress Bar
+            // Professional Progress Bar
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -849,7 +808,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Progress',
+                        'Your Progress',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -857,9 +816,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                         ),
                       ),
                       Text(
-                        claimedCount <= totalBoundaries 
-                            ? '$claimedCount/$totalBoundaries'
-                            : '$totalBoundaries/$totalBoundaries',
+                        '$userClaimedCount/$totalBoundaries',
                         style: TextStyle(
                           color: AppTheme.primaryColor,
                           fontSize: 14,
@@ -870,54 +827,18 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: totalBoundaries > 0 ? (claimedCount / totalBoundaries).clamp(0.0, 1.0) : 0,
+                    value: totalBoundaries > 0 ? userClaimedCount / totalBoundaries : 0,
                     backgroundColor: Colors.white24,
                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   const SizedBox(height: 8),
-                  // Debug buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _resetBoundariesForTesting,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
-                          ),
-                          child: const Text('Reset All', style: TextStyle(fontSize: 10)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _fixIncorrectlyClaimedBoundaries,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
-                          ),
-                          child: const Text('Fix Claims', style: TextStyle(fontSize: 10)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _checkBoundaryStatus,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
-                          ),
-                          child: const Text('Check Status', style: TextStyle(fontSize: 10)),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Event Total: $eventClaimedCount claimed by all users',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -948,12 +869,12 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         child: SafeArea(
           child: Row(
             children: [
-              // Claimed Boundaries Button
+              // User Claims Button
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _showClaimedBoundaries,
+                  onPressed: _showUserClaims,
                   icon: const Icon(Icons.celebration),
-                  label: Text('Claimed ($claimedCount)'),
+                  label: Text('My Claims ($userClaimedCount)'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -1001,7 +922,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             ),
             const SizedBox(height: 16),
             Text(
-              'Loading Event...',
+              'Loading AR Experience...',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -1022,7 +943,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  void _showClaimedBoundaries() {
+  void _showUserClaims() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1046,7 +967,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                   const Icon(Icons.celebration, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
-                    'Claimed Boundaries (${claimedBoundaries.length})',
+                    'My Claimed Boundaries (${userClaimedBoundaries.length})',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -1057,7 +978,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
               ),
             ),
             Expanded(
-              child: claimedBoundaries.isEmpty
+              child: userClaimedBoundaries.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1090,9 +1011,9 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: claimedBoundaries.length,
+                      itemCount: userClaimedBoundaries.length,
                       itemBuilder: (context, index) {
-                        final boundary = claimedBoundaries[index];
+                        final boundary = userClaimedBoundaries[index];
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
@@ -1177,8 +1098,10 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     _buildInfoRow('Description', currentEvent!.description),
                     _buildInfoRow('Venue', currentEvent!.venueName),
                     _buildInfoRow('Total Boundaries', '${currentEvent!.boundaries.length}'),
-                    _buildInfoRow('Claimed Boundaries', '$claimedCount'),
+                    _buildInfoRow('Your Claims', '$userClaimedCount'),
+                    _buildInfoRow('Event Total Claims', '$eventClaimedCount'),
                     _buildInfoRow('Event Code', currentEvent!.eventCode),
+                    _buildInfoRow('Visibility Radius', '${_visibilityRadius.toStringAsFixed(1)}m'),
                     if (currentEvent!.startDate != null)
                       _buildInfoRow('Start Date', currentEvent!.startDate.toString().substring(0, 16)),
                     if (currentEvent!.endDate != null)
@@ -1222,24 +1145,12 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
 
   @override
   void dispose() {
-    // Remove all callbacks to prevent setState calls after dispose
-    arService.onBoundaryDetected = null;
-    arService.onBoundaryClaimed = null;
-    arService.onProximityUpdate = null;
-    arService.onProgressUpdate = null;
-    arService.onVisibleBoundariesUpdate = null;
-    arService.onClaimedBoundariesUpdate = null;
-    arService.onPositionUpdate = null;
-    
-    // Dispose controllers
     confettiController.dispose();
-    pulseController.dispose();
     rotationController.dispose();
+    glowController.dispose();
+    pulseController.dispose();
     _cameraController?.dispose();
-    
-    // Dispose AR service last
     arService.dispose();
     super.dispose();
   }
 }
-

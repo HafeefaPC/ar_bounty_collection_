@@ -107,10 +107,10 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
   Widget _buildAnimatedHeader(double screenWidth, double screenHeight) {
     return Row(
       children: [
-        IconButton(
-          onPressed: () => context.go('/wallet/connect'),
-          icon: Icon(Icons.arrow_back, color: Colors.white, size: screenWidth * 0.06),
-          style: IconButton.styleFrom(
+                  IconButton(
+            onPressed: () => context.go('/wallet/connect'),
+            icon: Icon(Icons.arrow_back, color: Colors.white, size: screenWidth * 0.06),
+            style: IconButton.styleFrom(
             backgroundColor: Colors.white.withOpacity(0.2),
             padding: EdgeInsets.all(screenWidth * 0.03),
           ),
@@ -240,12 +240,12 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
         
         SizedBox(height: screenHeight * 0.025),
         
-        // My Goodies Option
+        // Boundary History Option
         _buildAnimatedOptionCard(
-          icon: Icons.inventory_2,
-          title: 'My Goodies',
-          subtitle: 'View your claimed items',
-          onTap: () => context.go('/goodies'),
+          icon: Icons.history,
+          title: 'My Boundary Collection',
+          subtitle: 'View all your claimed boundaries from different events',
+          onTap: () => context.go('/boundary-history'),
           screenWidth: screenWidth,
           screenHeight: screenHeight,
           delay: 900.ms,

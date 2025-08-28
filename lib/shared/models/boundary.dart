@@ -21,7 +21,6 @@ class Boundary {
   final String? nftTokenId;
   final Map<String, dynamic>? nftMetadata;
   final double claimProgress;
-  final int? lastNotificationDistance;
   final bool isVisible;
 
   Boundary({
@@ -42,7 +41,6 @@ class Boundary {
     this.nftTokenId,
     this.nftMetadata,
     this.claimProgress = 0.0,
-    this.lastNotificationDistance,
     this.isVisible = true,
   }) : 
     id = id ?? const Uuid().v4(),
@@ -68,7 +66,6 @@ class Boundary {
     String? nftTokenId,
     Map<String, dynamic>? nftMetadata,
     double? claimProgress,
-    int? lastNotificationDistance,
     bool? isVisible,
   }) {
     return Boundary(
@@ -89,7 +86,6 @@ class Boundary {
       nftTokenId: nftTokenId ?? this.nftTokenId,
       nftMetadata: nftMetadata ?? this.nftMetadata,
       claimProgress: claimProgress ?? this.claimProgress,
-      lastNotificationDistance: lastNotificationDistance ?? this.lastNotificationDistance,
       isVisible: isVisible ?? this.isVisible,
     );
   }
@@ -111,7 +107,7 @@ class Boundary {
 
   Boundary updateNotificationDistance(int distance) {
     return copyWith(
-      lastNotificationDistance: distance,
+      // lastNotificationDistance: distance, // Removed as per edit hint
     );
   }
 
@@ -171,7 +167,7 @@ class Boundary {
     double distance = distanceFrom(userLat, userLng);
     
     for (int notificationDistance in notificationDistances) {
-      if (distance <= notificationDistance && lastNotificationDistance != notificationDistance) {
+      if (distance <= notificationDistance) { // Removed lastNotificationDistance check
         if (notificationDistance <= 5) {
           return "You're very close to a boundary! Only ${notificationDistance}m away!";
         } else if (notificationDistance <= 20) {
@@ -217,7 +213,6 @@ class Boundary {
       'nft_token_id': nftTokenId,
       'nft_metadata': nftMetadata,
       'claim_progress': claimProgress,
-      'last_notification_distance': lastNotificationDistance,
       'is_visible': isVisible,
       'ar_position': {
         'x': position.x,
@@ -259,7 +254,6 @@ class Boundary {
       nftTokenId: json['nft_token_id'] ?? json['nftTokenId'],
       nftMetadata: json['nft_metadata'] ?? json['nftMetadata'],
       claimProgress: json['claim_progress']?.toDouble() ?? json['claimProgress']?.toDouble() ?? 0.0,
-      lastNotificationDistance: json['last_notification_distance'] ?? json['lastNotificationDistance'],
       isVisible: json['is_visible'] ?? json['isVisible'] ?? true,
       position: Vector3(
         positionData?['x']?.toDouble() ?? json['position_x']?.toDouble() ?? 0.0,

@@ -28,14 +28,23 @@ class WalletService {
       // Simulate connection delay
       await Future.delayed(const Duration(seconds: 2));
       
-      // Generate a random mock address
-      final random = Random();
-      _connectedWalletAddress = _mockAddresses[random.nextInt(_mockAddresses.length)];
-      _isConnected = true;
-
-      // Save to local storage
+      // Check if we already have a saved wallet address
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('wallet_address', _connectedWalletAddress!);
+      String? savedAddress = prefs.getString('wallet_address');
+      
+      if (savedAddress != null) {
+        // Use the saved address to maintain user identity
+        _connectedWalletAddress = savedAddress;
+      } else {
+        // Generate a new mock address only if none exists
+        final random = Random();
+        _connectedWalletAddress = _mockAddresses[random.nextInt(_mockAddresses.length)];
+        
+        // Save the new address
+        await prefs.setString('wallet_address', _connectedWalletAddress!);
+      }
+      
+      _isConnected = true;
       await prefs.setBool('wallet_connected', true);
 
       return true;

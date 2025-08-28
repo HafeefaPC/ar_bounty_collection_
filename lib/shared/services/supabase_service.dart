@@ -10,28 +10,7 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
-  late final SupabaseClient _client;
-
-  Future<void> initialize() async {
-    try {
-      // Check if already initialized
-      if (Supabase.instance.client != null) {
-        _client = Supabase.instance.client;
-        print('Supabase already initialized, using existing client');
-        return;
-      }
-      
-      await Supabase.initialize(
-        url: 'https://kkzgqrjgjcusmdivvbmj.supabase.co',
-        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtremdxcmpnamN1c21kaXZ2Ym1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg1NzEsImV4cCI6MjA3MTcwNDU3MX0.g82dcf0a2dS0aFEMigp_cpPZlDwRbmOKtuGoXuf0dEA',
-      );
-      _client = Supabase.instance.client;
-      print('Supabase initialized successfully');
-    } catch (e) {
-      print('Error initializing Supabase: $e');
-      rethrow;
-    }
-  }
+  SupabaseClient get _client => Supabase.instance.client;
 
   // Test Supabase connection
   Future<bool> testConnection() async {
@@ -114,12 +93,14 @@ class SupabaseService {
             'latitude': boundary.latitude,
             'longitude': boundary.longitude,
             'radius': boundary.radius,
+            'is_claimed': false, // Explicitly set to false for new boundaries
+            'claimed_by': null, // Explicitly set to null
+            'claimed_at': null, // Explicitly set to null
             'event_id': createdEvent.id,
             'nft_token_id': boundary.nftTokenId,
             'nft_metadata': boundary.nftMetadata,
-            'claim_progress': boundary.claimProgress,
-            'last_notification_distance': boundary.lastNotificationDistance,
-            'is_visible': boundary.isVisible,
+            'claim_progress': 0.0, // Start with 0 progress
+            'is_visible': true, // Start as visible
             'ar_position': {
               'x': boundary.position.x,
               'y': boundary.position.y,
@@ -382,6 +363,273 @@ class SupabaseService {
     } catch (e) {
       print('Error uploading image: $e');
       rethrow;
+    }
+  }
+
+  // User Boundary Claims
+  Future<List<Map<String, dynamic>>> getUserClaims(String walletAddress) async {
+    try {
+      // First try RPC function
+      try {
+        final response = await _client
+            .rpc('get_user_claims', params: {'user_wallet': walletAddress});
+        
+        return (response as List).cast<Map<String, dynamic>>();
+      } catch (rpcError) {
+        print('RPC function failed, using direct query: $rpcError');
+        
+        // Fallback: direct database query with event information
+        final response = await _client
+            .from('boundaries')
+            .select('''
+              id,
+              name,
+              description,
+              image_url,
+              latitude,
+              longitude,
+              event_id,
+              claimed_at,
+              claim_progress,
+              events!inner(
+                name,
+                event_code,
+                venue_name,
+                start_date,
+                end_date
+              )
+            ''')
+            .eq('claimed_by', walletAddress)
+            .eq('is_claimed', true)
+            .order('claimed_at', ascending: false);
+        
+        return (response as List).map((json) {
+          final eventData = json['events'] as Map<String, dynamic>;
+          return {
+            'boundary_id': json['id'],
+            'boundary_name': json['name'],
+            'boundary_description': json['description'],
+            'image_url': json['image_url'],
+            'latitude': json['latitude'],
+            'longitude': json['longitude'],
+            'event_id': json['event_id'],
+            'event_name': eventData['name'] ?? 'Unknown Event',
+            'event_code': eventData['event_code'] ?? 'UNKNOWN',
+            'venue_name': eventData['venue_name'] ?? 'Unknown Venue',
+            'start_date': eventData['start_date'],
+            'end_date': eventData['end_date'],
+            'claimed_at': json['claimed_at'],
+            'claim_distance': json['claim_progress'] ?? 0.0,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      print('Error fetching user claims: $e');
+      return [];
+    }
+  }
+
+  Future<bool> claimBoundaryForUser(String boundaryId, String walletAddress, double distance) async {
+    try {
+      // First try RPC function
+      try {
+        final response = await _client
+            .rpc('claim_boundary', params: {
+              'boundary_id': boundaryId,
+              'user_wallet': walletAddress,
+              'claim_distance': distance,
+            });
+        
+        return response == true;
+      } catch (rpcError) {
+        print('RPC function failed, using direct database update: $rpcError');
+        
+        // Fallback: direct database update
+        await _client
+            .from('boundaries')
+            .update({
+              'is_claimed': true,
+              'claimed_by': walletAddress,
+              'claimed_at': DateTime.now().toIso8601String(),
+              'claim_progress': 100.0,
+            })
+            .eq('id', boundaryId);
+        
+        // Log the claim in user_proximity_logs for tracking
+        try {
+          // Get event_id from the boundary
+          final boundaryResponse = await _client
+              .from('boundaries')
+              .select('event_id')
+              .eq('id', boundaryId)
+              .single();
+          
+          final eventId = boundaryResponse['event_id'];
+          
+          await _client
+              .from('user_proximity_logs')
+              .insert({
+                'user_wallet_address': walletAddress,
+                'boundary_id': boundaryId,
+                'event_id': eventId,
+                'distance_meters': distance,
+                'latitude': 0.0, // Will be filled by actual location
+                'longitude': 0.0, // Will be filled by actual location
+              });
+        } catch (logError) {
+          print('Could not log proximity: $logError');
+          // This is not critical, continue
+        }
+        
+        return true;
+      }
+    } catch (e) {
+      print('Error claiming boundary: $e');
+      return false;
+    }
+  }
+
+  Future<List<Boundary>> getNearbyBoundariesForUser(double lat, double lng, String eventId, {double maxDistance = 5.0}) async {
+    try {
+      final response = await _client
+          .rpc('get_nearby_boundaries', params: {
+            'user_lat': lat,
+            'user_lng': lng,
+            'event_id': eventId,
+            'max_distance': maxDistance,
+          });
+      
+      return (response as List).map((json) => Boundary.fromJson(json)).toList();
+    } catch (e) {
+      print('Error fetching nearby boundaries: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, int>> getEventStats(String eventId) async {
+    try {
+      final response = await _client
+          .rpc('get_event_stats', params: {'event_id': eventId});
+      
+      if (response is List && response.isNotEmpty) {
+        final stats = response.first as Map<String, dynamic>;
+        return {
+          'total_boundaries': stats['total_boundaries'] ?? 0,
+          'claimed_boundaries': stats['claimed_boundaries'] ?? 0,
+          'unique_claimers': stats['unique_claimers'] ?? 0,
+        };
+      }
+      return {'total_boundaries': 0, 'claimed_boundaries': 0, 'unique_claimers': 0};
+    } catch (e) {
+      print('Error fetching event stats: $e');
+      return {'total_boundaries': 0, 'claimed_boundaries': 0, 'unique_claimers': 0};
+    }
+  }
+
+  Future<List<Boundary>> getUserEventClaims(String walletAddress, String eventId) async {
+    try {
+      // Since user_boundary_claims table doesn't exist, query boundaries directly
+      final response = await _client
+          .from('boundaries')
+          .select('*')
+          .eq('claimed_by', walletAddress)
+          .eq('event_id', eventId)
+          .eq('is_claimed', true);
+      
+      return (response as List).map((json) => Boundary.fromJson(json)).toList();
+    } catch (e) {
+      print('Error fetching user event claims: $e');
+      return [];
+    }
+  }
+
+  // Debug method to reset all boundaries for an event (for testing)
+  Future<void> resetEventBoundaries(String eventId) async {
+    try {
+      await _client
+          .from('boundaries')
+          .update({
+            'is_claimed': false,
+            'claimed_by': null,
+            'claimed_at': null,
+            'claim_progress': 0.0,
+          })
+          .eq('event_id', eventId);
+      
+      print('Reset all boundaries for event: $eventId');
+    } catch (e) {
+      print('Error resetting boundaries: $e');
+    }
+  }
+
+  // Debug method to check boundary status
+  Future<List<Map<String, dynamic>>> getBoundaryStatus(String eventId) async {
+    try {
+      final response = await _client
+          .from('boundaries')
+          .select('id, name, is_claimed, claimed_by, claimed_at')
+          .eq('event_id', eventId);
+      
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('Error checking boundary status: $e');
+      return [];
+    }
+  }
+
+  // Fix incorrectly claimed boundaries (for debugging)
+  Future<void> fixIncorrectlyClaimedBoundaries(String eventId) async {
+    try {
+      // Find boundaries that are marked as claimed but have no claimed_by or claimed_at
+      final response = await _client
+          .from('boundaries')
+          .select('id, name, is_claimed, claimed_by, claimed_at')
+          .eq('event_id', eventId)
+          .eq('is_claimed', true);
+      
+      for (final boundary in response) {
+        if (boundary['claimed_by'] == null || boundary['claimed_at'] == null) {
+          // Fix incorrectly claimed boundary
+          await _client
+              .from('boundaries')
+              .update({
+                'is_claimed': false,
+                'claimed_by': null,
+                'claimed_at': null,
+                'claim_progress': 0.0,
+              })
+              .eq('id', boundary['id']);
+          
+          print('Fixed incorrectly claimed boundary: ${boundary['name']}');
+        }
+      }
+      
+      print('Boundary validation completed for event: $eventId');
+    } catch (e) {
+      print('Error fixing incorrectly claimed boundaries: $e');
+    }
+  }
+
+  // Get claimed boundaries grouped by event for better organization
+  Future<Map<String, List<Map<String, dynamic>>>> getClaimedBoundariesByEvent(String walletAddress) async {
+    try {
+      final allClaims = await getUserClaims(walletAddress);
+      
+      // Group by event_code
+      final Map<String, List<Map<String, dynamic>>> groupedClaims = {};
+      
+      for (final claim in allClaims) {
+        final eventCode = claim['event_code'] ?? 'UNKNOWN';
+        if (!groupedClaims.containsKey(eventCode)) {
+          groupedClaims[eventCode] = [];
+        }
+        groupedClaims[eventCode]!.add(claim);
+      }
+      
+      return groupedClaims;
+    } catch (e) {
+      print('Error grouping claimed boundaries by event: $e');
+      return {};
     }
   }
 }

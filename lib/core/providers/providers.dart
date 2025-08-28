@@ -135,15 +135,7 @@ final userClaimedBoundariesProvider = FutureProvider.family<List<Boundary>, Stri
 // Initialize providers
 void initializeProviders() {
   // Initialize services
-  final supabaseService = SupabaseService();
   final walletService = WalletService();
-  
-  // Initialize Supabase (only if not already initialized)
-  try {
-    supabaseService.initialize();
-  } catch (e) {
-    print('Supabase already initialized: $e');
-  }
   
   // Initialize Wallet Service
   walletService.checkPreviousConnection();

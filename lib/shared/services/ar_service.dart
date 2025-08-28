@@ -4,6 +4,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../models/boundary.dart';
 import '../models/event.dart';
 import 'supabase_service.dart';
+import 'wallet_service.dart';
 
 class ARService {
   static final ARService _instance = ARService._internal();
@@ -45,17 +46,47 @@ class ARService {
   }
 
   // Set current event and boundaries
-  void setEvent(Event event) {
+  Future<void> setEvent(Event event) async {
     _currentEvent = event;
     _boundaries = event.boundaries;
     
-    // Separate claimed and unclaimed boundaries
-    _claimedBoundaries = _boundaries.where((b) => b.isClaimed).toList();
-    _visibleBoundaries = _boundaries.where((b) => !b.isClaimed).toList();
+    // Filter boundaries to only include those from the current event
+    _boundaries = _boundaries.where((boundary) => boundary.eventId == event.id).toList();
     
-    // Trigger callbacks
-    onClaimedBoundariesUpdate?.call(_claimedBoundaries);
-    onVisibleBoundariesUpdate?.call(_visibleBoundaries);
+          // Load any previously claimed boundaries for this event from database
+      try {
+        final walletService = WalletService();
+        final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
+        
+        final claimedBoundaries = await _supabaseService.getUserEventClaims(walletAddress, event.id);
+        _claimedBoundaries = claimedBoundaries;
+        
+        // Only show unclaimed boundaries in visible list
+        _visibleBoundaries = _boundaries.where((b) => !b.isClaimed).toList();
+        
+        print('AR Service: Set event "${event.name}" with ${_boundaries.length} total boundaries');
+        print('AR Service: ${_claimedBoundaries.length} claimed, ${_visibleBoundaries.length} unclaimed');
+        print('AR Service: Loaded ${claimedBoundaries.length} claimed boundaries from database');
+        
+        // Trigger callbacks
+        onClaimedBoundariesUpdate?.call(_claimedBoundaries);
+        onVisibleBoundariesUpdate?.call(_visibleBoundaries);
+        
+        // Update progress
+        int claimedCount = _claimedBoundaries.length;
+        int unclaimedCount = _boundaries.where((b) => !b.isClaimed).length;
+        onProgressUpdate?.call(claimedCount, unclaimedCount);
+      } catch (e) {
+        print('Error loading claimed boundaries: $e');
+        
+        // Fallback to local data
+        _visibleBoundaries = _boundaries.where((b) => !b.isClaimed).toList();
+        _claimedBoundaries = _boundaries.where((b) => b.isClaimed).toList();
+        
+        // Trigger callbacks
+        onClaimedBoundariesUpdate?.call(_claimedBoundaries);
+        onVisibleBoundariesUpdate?.call(_visibleBoundaries);
+      }
   }
 
   // Start location tracking
@@ -142,9 +173,10 @@ class ARService {
 
     onProximityUpdate?.call(proximityHint);
 
-    // Update progress
+    // Update progress - only count unclaimed boundaries as total
     int claimed = _claimedBoundaries.length;
-    onProgressUpdate?.call(claimed, _boundaries.length);
+    int unclaimed = _boundaries.where((b) => !b.isClaimed).length;
+    onProgressUpdate?.call(claimed, unclaimed);
   }
 
   // Update boundary visibility based on user position
@@ -187,8 +219,15 @@ class ARService {
       // Get user wallet address (you should implement this based on your wallet service)
       String walletAddress = "user_wallet_address"; // Replace with actual wallet
       
-      // Claim boundary in database
-      await _supabaseService.claimBoundary(boundary.id, walletAddress);
+      // Claim boundary in database using the new method
+      final success = await _supabaseService.claimBoundaryForUser(boundary.id, walletAddress, boundary.distanceFrom(
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      ));
+      
+      if (!success) {
+        throw Exception('Failed to claim boundary');
+      }
       
       // Mark as claimed locally
       Boundary claimedBoundary = boundary.claim(walletAddress);
@@ -221,9 +260,10 @@ class ARService {
       onClaimedBoundariesUpdate?.call(_claimedBoundaries);
       onVisibleBoundariesUpdate?.call(_visibleBoundaries);
 
-      // Update progress
+      // Update progress - only count unclaimed boundaries as total
       int claimed = _claimedBoundaries.length;
-      onProgressUpdate?.call(claimed, _boundaries.length);
+      int unclaimed = _boundaries.where((b) => !b.isClaimed).length;
+      onProgressUpdate?.call(claimed, unclaimed);
 
       // Show success message
       onProximityUpdate?.call("Boundary claimed successfully! 🎉");

@@ -3,10 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:face_reflector/features/splash/splash_screen.dart';
 import 'package:face_reflector/features/wallet/wallet_connection_screen.dart';
 import 'package:face_reflector/features/wallet/wallet_options_screen.dart';
+import 'package:face_reflector/features/wallet/boundary_history_screen.dart';
 import 'package:face_reflector/features/event_joining/event_join_screen.dart';
 import 'package:face_reflector/features/ar_view/ar_view_screen.dart';
 import 'package:face_reflector/features/event_creation/event_creation_screen.dart';
-import 'package:face_reflector/features/goodies/my_goodies_screen.dart';
+
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -57,11 +58,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const EventCreationScreen(),
       ),
       
-      // My Goodies
+
+      
+      // Boundary History
       GoRoute(
-        path: '/goodies',
-        name: 'my-goodies',
-        builder: (context, state) => const MyGoodiesScreen(),
+        path: '/boundary-history',
+        name: 'boundary-history',
+        builder: (context, state) => const BoundaryHistoryScreen(),
       ),
     ],
   );
