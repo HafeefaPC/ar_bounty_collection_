@@ -111,7 +111,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
             onPressed: () => context.go('/wallet/connect'),
             icon: Icon(Icons.arrow_back, color: Colors.white, size: screenWidth * 0.06),
             style: IconButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.2),
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
             padding: EdgeInsets.all(screenWidth * 0.03),
           ),
         ).animate().fadeIn(
@@ -140,15 +140,15 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.05),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -159,7 +159,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
           Icon(
             _isConnected ? Icons.account_balance_wallet : Icons.account_balance_wallet_outlined,
             size: screenWidth * 0.12,
-            color: _isConnected ? Colors.green[300] : Colors.white.withOpacity(0.8),
+            color: _isConnected ? Colors.green[300] : Colors.white.withValues(alpha: 0.8),
           ).animate().fadeIn(
             duration: 600.ms,
             delay: 400.ms,
@@ -182,17 +182,17 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
             Container(
               padding: EdgeInsets.all(screenWidth * 0.03),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                 ),
               ),
               child: Text(
                 _walletAddress!,
                 style: TextStyle(
                   fontSize: screenWidth * 0.035,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontFamily: 'monospace',
                 ),
                 textAlign: TextAlign.center,
@@ -272,7 +272,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, 6),
             ),
@@ -288,7 +288,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -347,7 +347,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
           onPressed: _disconnectWallet,
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.white,
-            side: BorderSide(color: Colors.white.withOpacity(0.4), width: 1.5),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
@@ -384,7 +384,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
               borderRadius: BorderRadius.circular(15),
             ),
             elevation: 8,
-            shadowColor: Colors.black.withOpacity(0.2),
+            shadowColor: Colors.black.withValues(alpha: 0.2),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

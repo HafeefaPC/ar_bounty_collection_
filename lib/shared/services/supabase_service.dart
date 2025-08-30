@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event.dart';
 import '../models/boundary.dart';
@@ -11,6 +10,9 @@ class SupabaseService {
   SupabaseService._internal();
 
   SupabaseClient get _client => Supabase.instance.client;
+  
+  // Public getter for external services that need direct client access
+  SupabaseClient get client => _client;
 
   // Test Supabase connection
   Future<bool> testConnection() async {
@@ -131,19 +133,6 @@ class SupabaseService {
     }
   }
 
-  // Helper method to generate unique event codes
-  String _generateUniqueEventCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = DateTime.now().millisecondsSinceEpoch + 
-                   (DateTime.now().microsecondsSinceEpoch % 1000) +
-                   (DateTime.now().microsecond % 1000);
-    return String.fromCharCodes(
-      Iterable.generate(6, (index) {
-        final seed = random + index * 1000;
-        return chars.codeUnitAt(seed % chars.length);
-      })
-    );
-  }
 
   Future<void> updateEvent(Event event) async {
     try {

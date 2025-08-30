@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
 import 'package:confetti/confetti.dart';
@@ -68,17 +70,27 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
   int totalBoundaries = 0;
   int eventClaimedCount = 0;
   Boundary? detectedBoundary;
+  
+  // Performance optimization
+  Timer? _arUpdateTimer;
+  StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
+  StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
+  
+  // Enhanced image cache with memory management
+  final Map<String, Widget> _nftImageCache = {};
+  final Map<String, DateTime> _imageCacheTimestamp = {};
+  static const int _maxCacheSize = 60;
+  static const Duration _cacheExpiry = Duration(minutes: 15);
 
   // AR Positioning and Sensors
   double? _currentLatitude;
   double? _currentLongitude;
   double _deviceAzimuth = 0.0;
-  double _devicePitch = 0.0;
-  double _deviceRoll = 0.0;
+  // Note: Pitch and roll sensors available for future AR enhancements
   
   // Configurable settings
-  double _visibilityRadius = 2.0; // Default 2 meters
-  double _notificationDistance = 5.0; // Show notifications within 5 meters
+  double _visibilityRadius = 2.0; // Default 2 meters  
+  final double _notificationDistance = 5.0; // Show notifications within 5 meters
   
   // Professional Animations
   late ConfettiController confettiController;
@@ -158,22 +170,30 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
   }
 
   void _initializeSensors() {
-    // Listen to device orientation changes
-    gyroscopeEvents.listen((GyroscopeEvent event) {
-      setState(() {
-        _devicePitch += event.y * 0.1;
-        _deviceRoll += event.x * 0.1;
-      });
-      _updateARPositions();
+    // Optimized sensor updates with throttling
+    _gyroscopeSubscription = gyroscopeEventStream().listen((GyroscopeEvent event) {
+      // Future: Use gyroscope data for enhanced AR positioning
+      _throttledARUpdate();
     });
 
-    // Listen to compass/magnetometer for heading
-    magnetometerEvents.listen((MagnetometerEvent event) {
+    // Optimized compass/magnetometer updates
+    _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
       double azimuth = atan2(event.y, event.x) * 180 / pi;
-      setState(() {
-        _deviceAzimuth = azimuth;
-      });
-      _updateARPositions();
+      if ((azimuth - _deviceAzimuth).abs() > 1.5) { // More sensitive for professional view
+        setState(() {
+          _deviceAzimuth = azimuth;
+        });
+        _throttledARUpdate();
+      }
+    });
+  }
+  
+  void _throttledARUpdate() {
+    _arUpdateTimer?.cancel();
+    _arUpdateTimer = Timer(const Duration(milliseconds: 80), () { // Faster updates for professional view
+      if (mounted) {
+        _updateARPositions();
+      }
     });
   }
 
@@ -210,8 +230,12 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
       double relativeAngle = bearing - _deviceAzimuth;
       
       // Normalize angle to -180 to 180 degrees
-      while (relativeAngle > 180) relativeAngle -= 360;
-      while (relativeAngle < -180) relativeAngle += 360;
+      while (relativeAngle > 180) {
+        relativeAngle -= 360;
+      }
+      while (relativeAngle < -180) {
+        relativeAngle += 360;
+      }
       
       // Only show if within 90 degrees of device heading (field of view)
       if (relativeAngle.abs() > 90) continue;
@@ -308,7 +332,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
         eventClaimedCount = eventStats['claimed_boundaries'] ?? 0;
         
         // Set visibility radius from event settings
-        _visibilityRadius = currentEvent!.visibilityRadius ?? 2.0;
+        _visibilityRadius = currentEvent!.visibilityRadius;
         
         // Set up AR service with event-specific data
         arService.setEvent(currentEvent!);
@@ -408,6 +432,9 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
   Future<void> _claimBoundary(ProfessionalARElement element) async {
     if (!element.isClaimable || element.isClaimed) return;
     
+    // Apple-style haptic feedback
+    HapticFeedback.mediumImpact();
+    
     try {
       final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
       final success = await supabaseService.claimBoundaryForUser(
@@ -417,21 +444,22 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
       );
       
       if (success) {
+        HapticFeedback.heavyImpact(); // Success feedback
         _onBoundaryClaimed(element.boundary);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to claim boundary. It may have been claimed by someone else.'),
-            backgroundColor: Colors.red,
-          ),
+        HapticFeedback.lightImpact(); // Error feedback
+        _showAppleStyleAlert(
+          'Claim Failed',
+          'This boundary has already been claimed by another user.',
+          isError: true,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error claiming boundary: $e'),
-          backgroundColor: Colors.red,
-        ),
+      HapticFeedback.lightImpact(); // Error feedback
+      _showAppleStyleAlert(
+        'Connection Error',
+        'Unable to process claim. Please check your connection and try again.',
+        isError: true,
       );
     }
   }
@@ -462,7 +490,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(
@@ -473,7 +501,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
             ),
             const SizedBox(height: 16),
             Text(
-              'You\'ve claimed ${userClaimedCount} of $totalBoundaries boundaries in this event!',
+              'You\'ve claimed $userClaimedCount of $totalBoundaries boundaries in this event!',
               style: const TextStyle(fontSize: 14, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -490,66 +518,207 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
   }
 
   Widget _buildNFTImage(String imageUrl) {
+    // Enhanced cache management with expiry and size limits
+    if (_nftImageCache.containsKey(imageUrl)) {
+      final timestamp = _imageCacheTimestamp[imageUrl];
+      if (timestamp != null && DateTime.now().difference(timestamp) < _cacheExpiry) {
+        return _nftImageCache[imageUrl]!;
+      } else {
+        // Remove expired cache entry
+        _nftImageCache.remove(imageUrl);
+        _imageCacheTimestamp.remove(imageUrl);
+      }
+    }
+    
+    // Clean cache if it exceeds max size
+    if (_nftImageCache.length >= _maxCacheSize) {
+      _cleanImageCache();
+    }
+    
+    Widget imageWidget;
+    
     if (imageUrl.startsWith('http')) {
-      return Image.network(
+      imageWidget = Image.network(
         imageUrl,
         fit: BoxFit.cover,
+        cacheWidth: 320,
+        cacheHeight: 320,
         loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+          if (loadingProgress == null) {
+            _nftImageCache[imageUrl] = child;
+            _imageCacheTimestamp[imageUrl] = DateTime.now();
+            return child;
+          }
           return Container(
-            color: Colors.grey[300],
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.08),
+                  AppTheme.secondaryColor.withOpacity(0.06),
+                  AppTheme.accentColor.withOpacity(0.04),
+                ],
+                stops: const [0.0, 0.6, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
             child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                    : null,
-                color: AppTheme.primaryColor,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3.5,
+                      strokeCap: StrokeCap.round,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                      color: AppTheme.primaryColor,
+                      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Loading Premium NFT',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor.withOpacity(0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultNFTImage();
+          final defaultWidget = _buildDefaultNFTImage();
+          _nftImageCache[imageUrl] = defaultWidget;
+          _imageCacheTimestamp[imageUrl] = DateTime.now();
+          return defaultWidget;
         },
       );
     } else if (imageUrl.startsWith('/')) {
-      return Image.file(
+      imageWidget = Image.file(
         File(imageUrl),
         fit: BoxFit.cover,
+        cacheWidth: 320,
+        cacheHeight: 320,
         errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultNFTImage();
+          final defaultWidget = _buildDefaultNFTImage();
+          _nftImageCache[imageUrl] = defaultWidget;
+          _imageCacheTimestamp[imageUrl] = DateTime.now();
+          return defaultWidget;
         },
       );
     } else {
-      return _buildDefaultNFTImage();
+      imageWidget = _buildDefaultNFTImage();
     }
+    
+    _nftImageCache[imageUrl] = imageWidget;
+    _imageCacheTimestamp[imageUrl] = DateTime.now();
+    return imageWidget;
   }
 
   Widget _buildDefaultNFTImage() {
     return Container(
-      color: AppTheme.primaryColor.withOpacity(0.1),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.12),
+            AppTheme.secondaryColor.withOpacity(0.10),
+            AppTheme.accentColor.withOpacity(0.08),
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primaryColor.withOpacity(0.2),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.05),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.image,
-              color: AppTheme.primaryColor,
-              size: 40,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'NFT',
-              style: TextStyle(
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.15),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.diamond_outlined,
                 color: AppTheme.primaryColor,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.08),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Text(
+                'Premium NFT',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _cleanImageCache() {
+    if (_nftImageCache.length <= _maxCacheSize ~/ 2) return;
+    
+    // Remove oldest entries
+    final sortedEntries = _imageCacheTimestamp.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    
+    final entriesToRemove = sortedEntries.take(_nftImageCache.length - _maxCacheSize ~/ 2);
+    for (final entry in entriesToRemove) {
+      _nftImageCache.remove(entry.key);
+      _imageCacheTimestamp.remove(entry.key);
+    }
   }
 
   @override
@@ -627,7 +796,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.5),
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withValues(alpha: 0.5),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
@@ -649,15 +818,21 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
                       ),
                       const SizedBox(height: 8),
                       
-                      // Professional Status Display
+                      // Premium Professional Status Display
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                         decoration: BoxDecoration(
-                          color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
-                          borderRadius: BorderRadius.circular(15),
+                          gradient: LinearGradient(
+                            colors: element.isClaimable 
+                                ? [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor]
+                                : [Colors.orange.shade400, Colors.orange.shade600, Colors.deepOrange.shade700],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
+                              color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withValues(alpha: 0.3),
                               blurRadius: 10,
                               spreadRadius: 2,
                             ),
@@ -685,7 +860,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
                               const SizedBox(height: 4),
                               LinearProgressIndicator(
                                 value: element.progressPercentage / 100,
-                                backgroundColor: Colors.white.withOpacity(0.3),
+                                backgroundColor: Colors.white.withValues(alpha: 0.3),
                                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                                 minHeight: 2,
                               ),
@@ -862,7 +1037,7 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withOpacity(0.7),
+              Colors.black.withValues(alpha: 0.7),
             ],
           ),
         ),
@@ -1143,13 +1318,75 @@ class _ProfessionalARViewScreenState extends ConsumerState<ProfessionalARViewScr
     );
   }
 
+  void _showAppleStyleAlert(String title, String message, {bool isError = false}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.info_outline,
+              color: isError ? const Color(0xFFFF3B30) : AppTheme.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 16,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'OK',
+              style: TextStyle(
+                color: isError ? const Color(0xFFFF3B30) : AppTheme.primaryColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   @override
   void dispose() {
+    // Cancel performance optimizations
+    _arUpdateTimer?.cancel();
+    _gyroscopeSubscription?.cancel();
+    _magnetometerSubscription?.cancel();
+    
+    // Dispose controllers
     confettiController.dispose();
     rotationController.dispose();
     glowController.dispose();
     pulseController.dispose();
     _cameraController?.dispose();
+    
+    // Clear image caches
+    _nftImageCache.clear();
+    _imageCacheTimestamp.clear();
+    
+    // Dispose AR service
     arService.dispose();
     super.dispose();
   }

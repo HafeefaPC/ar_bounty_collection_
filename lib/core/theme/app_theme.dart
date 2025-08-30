@@ -1,30 +1,66 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colors
-  static const Color primaryColor = Color(0xFF6366F1);
-  static const Color secondaryColor = Color(0xFF8B5CF6);
-  static const Color accentColor = Color(0xFF06B6D4);
-  static const Color successColor = Color(0xFF10B981);
-  static const Color warningColor = Color(0xFFF59E0B);
-  static const Color errorColor = Color(0xFFEF4444);
-  static const Color backgroundColor = Color(0xFF0F0F23);
+  // Apple-inspired Color System
+  static const Color primaryColor = Color(0xFF007AFF);        // iOS Blue
+  static const Color secondaryColor = Color(0xFF5856D6);      // iOS Purple 
+  static const Color accentColor = Color(0xFF00C7BE);         // iOS Teal
+  static const Color successColor = Color(0xFF34C759);        // iOS Green
+  static const Color warningColor = Color(0xFFFF9F0A);        // iOS Orange
+  static const Color errorColor = Color(0xFFFF3B30);          // iOS Red
+  static const Color backgroundColor = Color(0xFF000000);      // Pure Black
   
-  // Gradients
+  // Additional Apple System Colors
+  static const Color labelColor = Color(0xFF000000);
+  static const Color secondaryLabelColor = Color(0x993C3C43);
+  static const Color tertiaryLabelColor = Color(0x4D3C3C43);
+  static const Color quaternaryLabelColor = Color(0x2E3C3C43);
+  static const Color systemFillColor = Color(0x33787880);
+  static const Color secondarySystemFillColor = Color(0x29787880);
+  static const Color tertiarySystemFillColor = Color(0x1E787880);
+  static const Color quaternarySystemFillColor = Color(0x14787880);
+  
+  // Surface Colors
+  static const Color surfaceColor = Color(0xFFFFFFFF);
+  static const Color surfaceDimColor = Color(0xFFF2F2F7);
+  static const Color surfaceBrightColor = Color(0xFFFFFFFF);
+  
+  // Apple-inspired Gradients with enhanced sophistication
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primaryColor, secondaryColor],
+    colors: [primaryColor, secondaryColor, accentColor],
+    stops: [0.0, 0.6, 1.0],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [accentColor, Color(0xFF0891B2)],
+    colors: [accentColor, primaryColor, secondaryColor],
+    stops: [0.0, 0.5, 1.0],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   
   static const LinearGradient successGradient = LinearGradient(
-    colors: [successColor, Color(0xFF059669)],
+    colors: [successColor, accentColor],
+    stops: [0.0, 1.0],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  
+  static const LinearGradient glassmorphismGradient = LinearGradient(
+    colors: [
+      Color(0x1AFFFFFF),
+      Color(0x0DFFFFFF),
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  
+  static const LinearGradient neuomorphicGradient = LinearGradient(
+    colors: [
+      Color(0xFFFFFFFF),
+      Color(0xFFF0F0F0),
+    ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

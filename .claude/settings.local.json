@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter build:*)",
+      "Bash(dart:*)",
+      "Bash(timeout:*)",
+      "WebFetch(domain:docs.privy.io)",
+      "WebFetch(domain:dashboard.privy.io)",
+      "WebSearch",
+      "WebFetch(domain:pub.dev)",
+      "Bash(flutter run:*)",
+      "Bash(flutter:*)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/**)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/example/lib/**)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/lib/**)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/lib/src/**)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/lib/src/models/linked_accounts/**)",
+      "Read(/Users/aazimanish/.pub-cache/hosted/pub.dev/privy_flutter-0.3.0/lib/src/modules/login_with_siwe/**)",
+      "WebFetch(domain:docs.reown.com)",
+      "WebFetch(domain:docs.core.app)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

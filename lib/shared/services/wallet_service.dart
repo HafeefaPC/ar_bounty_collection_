@@ -1,182 +1,166 @@
-import 'dart:math';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'wallet_connect_service.dart';
 
 class WalletService {
   static final WalletService _instance = WalletService._internal();
   factory WalletService() => _instance;
   WalletService._internal();
 
-  String? _connectedWalletAddress;
-  bool _isConnected = false;
+  final WalletConnectService _walletConnectService = WalletConnectService();
 
-  // Mock wallet addresses for testing
-  static const List<String> _mockAddresses = [
-    '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
-    '0x8ba1f109551bD432803012645Hac136c772c3c3',
-    '0x1234567890123456789012345678901234567890',
-    '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-    '0x9876543210987654321098765432109876543210',
-  ];
+  String? get walletAddress => _walletConnectService.walletAddress;
+  String? get connectedWalletAddress => _walletConnectService.walletAddress;
+  bool get isConnected => _walletConnectService.isConnected;
 
-  String? get walletAddress => _connectedWalletAddress;
-  String? get connectedWalletAddress => _connectedWalletAddress;
-  bool get isConnected => _isConnected;
+  // Initialize WalletConnect service
+  Future<void> initialize() async {
+    await _walletConnectService.initialize();
+  }
 
-  // Simulate wallet connection
+  // Connect wallet with WalletConnect modal
   Future<bool> connectWallet() async {
     try {
-      // Simulate connection delay
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Check if we already have a saved wallet address
-      final prefs = await SharedPreferences.getInstance();
-      String? savedAddress = prefs.getString('wallet_address');
-      
-      if (savedAddress != null) {
-        // Use the saved address to maintain user identity
-        _connectedWalletAddress = savedAddress;
-      } else {
-        // Generate a new mock address only if none exists
-        final random = Random();
-        _connectedWalletAddress = _mockAddresses[random.nextInt(_mockAddresses.length)];
-        
-        // Save the new address
-        await prefs.setString('wallet_address', _connectedWalletAddress!);
-      }
-      
-      _isConnected = true;
-      await prefs.setBool('wallet_connected', true);
-
+      // This would require context, so we return true for now
+      // The actual connection will happen when openModal is called
       return true;
     } catch (e) {
-      print('Error connecting wallet: $e');
+      return false;
+    }
+  }
+
+  // Open wallet connection modal (requires context)
+  Future<void> openWalletModal(context) async {
+    await _walletConnectService.openModal(context);
+  }
+
+  // Connect to Core mobile wallet via Wallet Connect
+  Future<bool> connectToCoreMobile() async {
+    return await _walletConnectService.connectToCore();
+  }
+
+  // Connect wallet with email authentication (legacy - now redirects to WalletConnect)
+  Future<bool> connectWalletWithEmail(String email) async {
+    // Email authentication is not supported with pure WalletConnect
+    // This method is kept for backward compatibility
+    return false;
+  }
+
+  // Connect external wallet
+  Future<bool> connectExternalWallet({String? walletType}) async {
+    try {
+      return await _walletConnectService.connectToCore();
+    } catch (e) {
       return false;
     }
   }
 
   // Disconnect wallet
   Future<void> disconnectWallet() async {
-    _connectedWalletAddress = null;
-    _isConnected = false;
-
-    // Clear from local storage
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('wallet_address');
-    await prefs.setBool('wallet_connected', false);
+    await _walletConnectService.disconnect();
   }
 
   // Check if wallet was previously connected
   Future<bool> checkPreviousConnection() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final wasConnected = prefs.getBool('wallet_connected') ?? false;
-      
-      if (wasConnected) {
-        _connectedWalletAddress = prefs.getString('wallet_address');
-        _isConnected = _connectedWalletAddress != null;
-      }
-
-      return _isConnected;
-    } catch (e) {
-      print('Error checking previous connection: $e');
-      return false;
-    }
+    return _walletConnectService.isConnected;
   }
 
-  // Get wallet balance (mock)
+  // Get wallet balance (needs to be implemented with Web3 calls)
   Future<double> getWalletBalance() async {
-    if (!_isConnected) return 0.0;
-    
-    // Simulate API call delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Return random balance between 0.1 and 10.0
-    final random = Random();
-    return 0.1 + random.nextDouble() * 9.9;
+    // This would require a Web3 service to get the actual balance
+    // For now, return 0.0
+    return 0.0;
   }
 
-  // Sign message (mock)
+  // Sign message
   Future<String> signMessage(String message) async {
-    if (!_isConnected) throw Exception('Wallet not connected');
-    
-    // Simulate signing delay
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Return mock signature
-    final random = Random();
-    const chars = '0123456789abcdef';
-    return '0x' + String.fromCharCodes(
-      Iterable.generate(64, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
-    );
+    final signature = await _walletConnectService.signMessage(message);
+    return signature ?? '';
   }
 
-  // Send transaction (mock)
+  // Send transaction
   Future<String> sendTransaction({
     required String to,
-    required double amount,
+    required String amount,
     String? data,
   }) async {
-    if (!_isConnected) throw Exception('Wallet not connected');
-    
-    // Simulate transaction delay
-    await Future.delayed(const Duration(seconds: 3));
-    
-    // Return mock transaction hash
-    final random = Random();
-    const chars = '0123456789abcdef';
-    return '0x' + String.fromCharCodes(
-      Iterable.generate(64, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
+    // Convert amount to wei (assuming amount is in ETH/AVAX)
+    final wei = (double.parse(amount) * 1e18).toInt().toRadixString(16);
+    final txHash = await _walletConnectService.sendTransaction(
+      to: to,
+      value: '0x$wei',
+      data: data,
     );
+    return txHash ?? '';
   }
 
-  // Get transaction history (mock)
+  // Get transaction history (would need to be implemented with blockchain API)
   Future<List<Map<String, dynamic>>> getTransactionHistory() async {
-    if (!_isConnected) return [];
-    
-    // Simulate API call delay
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    // Return mock transaction history
-    return [
-      {
-        'hash': '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-        'from': _connectedWalletAddress,
-        'to': '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
-        'value': '0.1',
-        'timestamp': DateTime.now().subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
-        'status': 'confirmed',
-      },
-      {
-        'hash': '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-        'from': '0x8ba1f109551bD432803012645Hac136c772c3c3',
-        'to': _connectedWalletAddress,
-        'value': '0.5',
-        'timestamp': DateTime.now().subtract(const Duration(days: 1)).millisecondsSinceEpoch,
-        'status': 'confirmed',
-      },
-    ];
+    // This would require a blockchain API service
+    return [];
   }
+
+  // Export wallet (not supported with WalletConnect)
+  Future<String?> exportWallet() async {
+    // Not supported with WalletConnect as it's non-custodial
+    return null;
+  }
+
+  // Get user profile (limited with WalletConnect)
+  Map<String, dynamic>? get userProfile => {
+    'walletAddress': walletAddress,
+    'walletType': getWalletType(),
+  };
+
+  // Get user email (not available with WalletConnect)
+  String? get userEmail => null;
 
   // Validate wallet address format
   static bool isValidAddress(String address) {
-    // Basic Ethereum address validation
-    return address.startsWith('0x') && address.length == 42;
+    return WalletConnectService.isValidAddress(address);
   }
 
   // Get shortened address for display
   static String getShortAddress(String address) {
-    if (address.length <= 10) return address;
-    return '${address.substring(0, 6)}...${address.substring(address.length - 4)}';
+    return WalletConnectService.getShortAddress(address);
   }
 
-  // Get wallet type (mock)
+  // Get wallet type
   String getWalletType() {
-    if (!_isConnected) return 'Not Connected';
-    
-    // Simulate different wallet types
-    final random = Random();
-    final types = ['MetaMask', 'WalletConnect', 'Coinbase Wallet', 'Trust Wallet'];
-    return types[random.nextInt(types.length)];
+    return _walletConnectService.getWalletType();
+  }
+
+  // Create embedded wallet (not supported with WalletConnect)
+  Future<bool> createEmbeddedWallet() async {
+    return false;
+  }
+
+  // Check if user has embedded wallet (not supported with WalletConnect)
+  bool hasEmbeddedWallet() {
+    return false;
+  }
+
+  // Connect wallet with SMS authentication (not supported with WalletConnect)
+  Future<bool> connectWalletWithSMS(String phoneNumber) async {
+    return false;
+  }
+
+  // Switch to specific chain
+  Future<bool> switchChain(String chainId) async {
+    return await _walletConnectService.switchChain(chainId);
+  }
+
+  // Get supported chains
+  List<String> getSupportedChains() {
+    return _walletConnectService.getSupportedChains();
+  }
+
+  // Get wallet connect service events stream
+  Stream<WalletConnectEvent> get walletEvents => _walletConnectService.events;
+
+  // Get current chain ID
+  String? get chainId => _walletConnectService.chainId;
+
+  // Clean up resources
+  void dispose() {
+    _walletConnectService.dispose();
   }
 }
-

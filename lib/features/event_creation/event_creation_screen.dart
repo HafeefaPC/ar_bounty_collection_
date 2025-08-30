@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, FilteringTextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,13 +8,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'dart:math';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
-import 'package:vector_math/vector_math.dart' as vector_math;
 import 'package:geocoding/geocoding.dart';
 
 class EventCreationScreen extends ConsumerStatefulWidget {
@@ -56,18 +53,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
   
   // Step 3: Boundary Configuration
   double _boundaryRadius = 2.0; // Default 2 meters for boundary radius
   
   // Step 4: Boundary Placement
   final List<LatLng> _boundaryLocations = [];
-  int _currentBoundaryIndex = 0;
   
   // Map state
   LatLng _center = const LatLng(37.7749, -122.4194); // Default to San Francisco
-  double _zoom = 15.0;
+  final double _zoom = 15.0;
   
   // Loading state
   bool _isLoading = false;
@@ -237,7 +232,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             circleId: const CircleId('event_area'),
             center: position,
             radius: _selectedAreaRadius,
-            fillColor: AppTheme.primaryColor.withOpacity(0.3),
+            fillColor: AppTheme.primaryColor.withValues(alpha: 0.3),
             strokeColor: AppTheme.primaryColor,
             strokeWidth: 2,
           ),
@@ -268,7 +263,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   void _searchLocation() async {
     if (_searchController.text.isEmpty) return;
 
-    setState(() => _isSearching = true);
+
 
     try {
       List<Location> locations = await locationFromAddress(_searchController.text);
@@ -292,8 +287,6 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      setState(() => _isSearching = false);
     }
   }
 
@@ -400,7 +393,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
               ),
               style: const TextStyle(color: Colors.white),
               validator: (value) {
@@ -423,7 +416,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
               ),
               style: const TextStyle(color: Colors.white),
               validator: (value) {
@@ -446,7 +439,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.white30),
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,7 +469,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.white30),
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,7 +505,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.white30),
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,7 +535,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.white30),
                         borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,7 +570,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
               ),
               style: const TextStyle(color: Colors.white),
               validator: (value) {
@@ -601,7 +594,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                 suffixText: 'NFTs',
               ),
               style: const TextStyle(color: Colors.white),
@@ -627,7 +620,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.white30, style: BorderStyle.solid),
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
                 child: _nftImagePath != null
                     ? ClipRRect(
@@ -679,7 +672,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: Colors.white.withValues(alpha: 0.1),
                   ),
                   style: const TextStyle(color: Colors.white),
                   onSubmitted: (_) => _searchLocation(),
@@ -740,7 +733,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                           circleId: const CircleId('event_area'),
                           center: _selectedAreaCenter!,
                           radius: _selectedAreaRadius,
-                          fillColor: AppTheme.primaryColor.withOpacity(0.3),
+                          fillColor: AppTheme.primaryColor.withValues(alpha: 0.3),
                           strokeColor: AppTheme.primaryColor,
                           strokeWidth: 2,
                         ),
@@ -777,7 +770,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             decoration: BoxDecoration(
               border: Border.all(color: Colors.white30),
               borderRadius: BorderRadius.circular(12),
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,7 +806,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             decoration: BoxDecoration(
               border: Border.all(color: Colors.white30),
               borderRadius: BorderRadius.circular(12),
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,7 +855,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               const SizedBox(height: 12),
               LinearProgressIndicator(
                 value: _boundaryLocations.length / nftSupplyCount,
-                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
               ),
               const SizedBox(height: 8),
@@ -898,9 +891,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.2),
+              color: AppTheme.primaryColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5)),
+              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
             ),
             child: Row(
               children: [
@@ -1090,7 +1083,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.2),
+                color: AppTheme.primaryColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.primaryColor),
               ),
@@ -1193,40 +1186,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     }
   }
 
-  Future<void> _testDatabaseConnection() async {
-    try {
-      final supabaseService = SupabaseService();
-      
-      // Test basic connection using the testConnection method
-      final isConnected = await supabaseService.testConnection();
-      
-      if (isConnected) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Database connection successful!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Database connection failed!'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Database connection error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 10),
-        ),
-      );
-    }
-  }
+
 
   Future<void> _testCreateMinimalEvent() async {
     try {
@@ -1294,7 +1254,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     decoration: BoxDecoration(
                       color: index <= _currentStep 
                           ? AppTheme.primaryColor 
-                          : Colors.white.withOpacity(0.2),
+                          : Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

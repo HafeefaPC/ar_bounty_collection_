@@ -87,8 +87,8 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primaryColor.withOpacity(0.1),
-              AppTheme.secondaryColor.withOpacity(0.1),
+              AppTheme.primaryColor.withValues(alpha: 0.1),
+              AppTheme.secondaryColor.withValues(alpha: 0.1),
             ],
           ),
         ),
@@ -101,9 +101,9 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     children: [
@@ -125,7 +125,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                         'Boundaries Collected',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -166,7 +166,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                                     error!,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: Colors.white.withValues(alpha: 0.7),
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -189,7 +189,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                                       Icon(
                                         Icons.explore,
                                         size: 64,
-                                        color: Colors.white.withOpacity(0.5),
+                                        color: Colors.white.withValues(alpha: 0.5),
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
@@ -205,7 +205,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                                         'Join events and claim boundaries to see them here',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Colors.white.withValues(alpha: 0.7),
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -238,27 +238,22 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
 
   Widget _buildClaimCard(Map<String, dynamic> claim) {
     final boundaryName = claim['boundary_name'] ?? 'Unknown Boundary';
-    final boundaryDescription = claim['boundary_description'] ?? '';
     final eventName = claim['event_name'] ?? 'Unknown Event';
     final eventCode = claim['event_code'] ?? 'UNKNOWN';
     final venueName = claim['venue_name'] ?? 'Unknown Venue';
     final claimedAt = claim['claimed_at'] != null 
         ? DateTime.parse(claim['claimed_at'])
         : null;
-    final claimDistance = claim['claim_distance']?.toDouble() ?? 0.0;
     final startDate = claim['start_date'] != null 
         ? DateTime.parse(claim['start_date'])
-        : null;
-    final endDate = claim['end_date'] != null 
-        ? DateTime.parse(claim['end_date'])
         : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
@@ -266,7 +261,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.2),
+            color: AppTheme.primaryColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(25),
           ),
           child: Icon(
@@ -290,7 +285,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
             Text(
               eventName,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -299,7 +294,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
             Text(
               'Event Code: $eventCode',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 12,
               ),
             ),
@@ -308,7 +303,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
               Text(
                 'Venue: $venueName',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
@@ -318,7 +313,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
               Text(
                 'Event: ${startDate.toString().substring(0, 10)}',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
@@ -328,26 +323,17 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
               Text(
                 'Claimed: ${claimedAt.toString().substring(0, 16)}',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
             ],
-            if (claimDistance > 0) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Distance: ${claimDistance.toStringAsFixed(1)}m',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 12,
-                ),
-              ),
-            ],
+
           ],
         ),
         trailing: Icon(
           Icons.arrow_forward_ios,
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           size: 16,
         ),
         onTap: () {

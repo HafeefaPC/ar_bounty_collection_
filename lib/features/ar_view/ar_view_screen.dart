@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -62,13 +63,24 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   int totalBoundaries = 0;
   bool showClaimedBoundaries = false;
   Boundary? detectedBoundary;
+  
+  // Performance optimization
+  Timer? _arUpdateTimer;
+  StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
+  StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
+  
+  // Enhanced NFT image cache with memory management
+  final Map<String, Widget> _nftImageCache = {};
+  final Map<String, DateTime> _imageCacheTimestamp = {};
+  static const int _maxCacheSize = 50;
+  static const Duration _cacheExpiry = Duration(minutes: 10);
 
   // AR Positioning and Sensors
   double? _currentLatitude;
   double? _currentLongitude;
   double _deviceAzimuth = 0.0; // Device heading in degrees
-  double _devicePitch = 0.0;   // Device pitch in degrees
-  double _deviceRoll = 0.0;    // Device roll in degrees
+  // Note: These are updated by sensors but not used in current AR implementation
+  // They could be used for advanced AR positioning in future versions
   
   // AR Elements positioning
   List<ARElement> arElements = [];
@@ -139,23 +151,32 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   void _initializeSensors() {
-    // Listen to device orientation changes
-    gyroscopeEvents.listen((GyroscopeEvent event) {
-      setState(() {
-        _devicePitch += event.y * 0.1; // Convert to degrees
-        _deviceRoll += event.x * 0.1;
-      });
-      _updateARPositions();
+    // Throttled sensor updates for better performance
+    _gyroscopeSubscription = gyroscopeEventStream().listen((GyroscopeEvent event) {
+      // Future: Use pitch and roll for advanced AR positioning
+      // Currently only using azimuth for horizontal positioning
+      _throttledARUpdate();
     });
 
-    // Listen to compass/magnetometer for heading
-    magnetometerEvents.listen((MagnetometerEvent event) {
+    // Listen to compass/magnetometer for heading with throttling
+    _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
       // Calculate azimuth from magnetometer data
       double azimuth = atan2(event.y, event.x) * 180 / pi;
-      setState(() {
-        _deviceAzimuth = azimuth;
-      });
-      _updateARPositions();
+      if ((azimuth - _deviceAzimuth).abs() > 2.0) { // Only update if significant change
+        setState(() {
+          _deviceAzimuth = azimuth;
+        });
+        _throttledARUpdate();
+      }
+    });
+  }
+  
+  void _throttledARUpdate() {
+    _arUpdateTimer?.cancel();
+    _arUpdateTimer = Timer(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _updateARPositions();
+      }
     });
   }
 
@@ -186,8 +207,12 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       double relativeAngle = bearing - _deviceAzimuth;
       
       // Normalize angle to -180 to 180 degrees
-      while (relativeAngle > 180) relativeAngle -= 360;
-      while (relativeAngle < -180) relativeAngle += 360;
+      while (relativeAngle > 180) {
+        relativeAngle -= 360;
+      }
+      while (relativeAngle < -180) {
+        relativeAngle += 360;
+      }
       
       // Only show if within 90 degrees of device heading (field of view)
       if (relativeAngle.abs() > 90) continue;
@@ -489,7 +514,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(
@@ -511,64 +536,176 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   }
 
   Widget _buildNFTImage(String imageUrl) {
-    // Handle different image URL types
+    // Enhanced cache management with expiry and size limits
+    if (_nftImageCache.containsKey(imageUrl)) {
+      final timestamp = _imageCacheTimestamp[imageUrl];
+      if (timestamp != null && DateTime.now().difference(timestamp) < _cacheExpiry) {
+        return _nftImageCache[imageUrl]!;
+      } else {
+        // Remove expired cache entry
+        _nftImageCache.remove(imageUrl);
+        _imageCacheTimestamp.remove(imageUrl);
+      }
+    }
+    
+    // Clean cache if it exceeds max size
+    if (_nftImageCache.length >= _maxCacheSize) {
+      _cleanImageCache();
+    }
+    
+    Widget imageWidget;
+    
+    // Handle different image URL types with Apple-style loading
     if (imageUrl.startsWith('http')) {
-      // Network image
-      return Image.network(
+      imageWidget = Image.network(
         imageUrl,
         fit: BoxFit.cover,
+        cacheWidth: 300, // Optimize for AR display size
+        cacheHeight: 300,
         loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+          if (loadingProgress == null) {
+            // Cache the loaded image with timestamp
+            _nftImageCache[imageUrl] = child;
+            _imageCacheTimestamp[imageUrl] = DateTime.now();
+            return child;
+          }
           return Container(
-            color: Colors.grey[300],
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.05),
+                  AppTheme.secondaryColor.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                    : null,
-                color: AppTheme.primaryColor,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      strokeCap: StrokeCap.round,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                      color: AppTheme.primaryColor,
+                      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Loading NFT',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor.withOpacity(0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultNFTImage();
+          final defaultWidget = _buildDefaultNFTImage();
+          _nftImageCache[imageUrl] = defaultWidget;
+          _imageCacheTimestamp[imageUrl] = DateTime.now();
+          return defaultWidget;
         },
       );
     } else if (imageUrl.startsWith('/')) {
-      // File path
-      return Image.file(
+      imageWidget = Image.file(
         File(imageUrl),
         fit: BoxFit.cover,
+        cacheWidth: 300,
+        cacheHeight: 300,
         errorBuilder: (context, error, stackTrace) {
-          return _buildDefaultNFTImage();
+          final defaultWidget = _buildDefaultNFTImage();
+          _nftImageCache[imageUrl] = defaultWidget;
+          _imageCacheTimestamp[imageUrl] = DateTime.now();
+          return defaultWidget;
         },
       );
     } else {
-      // Asset or default
-      return _buildDefaultNFTImage();
+      imageWidget = _buildDefaultNFTImage();
     }
+    
+    // Cache the widget for performance with timestamp
+    _nftImageCache[imageUrl] = imageWidget;
+    _imageCacheTimestamp[imageUrl] = DateTime.now();
+    return imageWidget;
   }
 
   Widget _buildDefaultNFTImage() {
     return Container(
-      color: AppTheme.primaryColor.withOpacity(0.1),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.08),
+            AppTheme.secondaryColor.withOpacity(0.08),
+            AppTheme.accentColor.withOpacity(0.05),
+          ],
+          stops: const [0.0, 0.7, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.primaryColor.withOpacity(0.15),
+          width: 1.5,
+        ),
+      ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.image,
-              color: AppTheme.primaryColor,
-              size: 40,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'NFT',
-              style: TextStyle(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.collections_outlined,
                 color: AppTheme.primaryColor,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.05),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Text(
+                'NFT Collectible',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
               ),
             ),
           ],
@@ -577,19 +714,108 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
+  void _cleanImageCache() {
+    if (_nftImageCache.length <= _maxCacheSize ~/ 2) return;
+    
+    // Remove oldest entries
+    final sortedEntries = _imageCacheTimestamp.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    
+    final entriesToRemove = sortedEntries.take(_nftImageCache.length - _maxCacheSize ~/ 2);
+    for (final entry in entriesToRemove) {
+      _nftImageCache.remove(entry.key);
+      _imageCacheTimestamp.remove(entry.key);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Camera View
+          // Camera View with Apple-style loading
           if (isCameraInitialized && _cameraController != null)
-            CameraPreview(_cameraController!)
+            ClipRect(child: CameraPreview(_cameraController!))
           else
             Container(
-              color: Colors.black,
-              child: const Center(
-                child: CircularProgressIndicator(color: Colors.white),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF000000),
+                    AppTheme.backgroundColor.withOpacity(0.95),
+                    const Color(0xFF000000),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppTheme.primaryColor.withOpacity(0.15),
+                            AppTheme.secondaryColor.withOpacity(0.15),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(32),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.2),
+                            blurRadius: 24,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color: Colors.white,
+                        size: 56,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor,
+                        backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
+                        strokeWidth: 3,
+                        strokeCap: StrokeCap.round,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Initializing AR Camera',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Preparing your AR experience...',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           
@@ -673,59 +899,153 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     scale: element.isClaimable ? pulseAnimation.value : 1.0,
                     child: Column(
                       children: [
-                        // NFT Image Container
+                        // Enhanced NFT Image Container with premium Apple-style design
                         Container(
                           width: 150,
                           height: 150,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
-                              width: 4,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: element.isClaimable 
+                                  ? [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor]
+                                  : [Colors.orange.shade300, Colors.orange.shade500, Colors.deepOrange.shade600],
+                              stops: const [0.0, 0.6, 1.0],
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.5),
-                                blurRadius: 20,
-                                spreadRadius: 5,
+                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.4),
+                                blurRadius: 32,
+                                spreadRadius: 0,
+                                offset: const Offset(0, 12),
+                              ),
+                              BoxShadow(
+                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.15),
+                                blurRadius: 64,
+                                spreadRadius: 12,
+                                offset: const Offset(0, 0),
+                              ),
+                              // Inner highlight
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.2),
+                                blurRadius: 8,
+                                spreadRadius: -2,
+                                offset: const Offset(0, -4),
                               ),
                             ],
                           ),
-                          child: ClipOval(
-                            child: _buildNFTImage(element.boundary.imageUrl),
+                          child: Container(
+                            margin: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: _buildNFTImage(element.boundary.imageUrl),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Distance and Status Text
+                        // Premium Apple-style status display with glassmorphism
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           decoration: BoxDecoration(
-                            color: element.isClaimable ? AppTheme.primaryColor : Colors.orange,
-                            borderRadius: BorderRadius.circular(15),
+                            gradient: LinearGradient(
+                              colors: element.isClaimable 
+                                  ? [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor]
+                                  : [Colors.orange.shade300, Colors.orange.shade500, Colors.deepOrange.shade600],
+                              stops: const [0.0, 0.6, 1.0],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 1.5,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
-                                blurRadius: 10,
-                                spreadRadius: 2,
+                                blurRadius: 20,
+                                spreadRadius: 0,
+                                offset: const Offset(0, 8),
+                              ),
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.1),
+                                blurRadius: 8,
+                                spreadRadius: -2,
+                                offset: const Offset(0, -2),
                               ),
                             ],
                           ),
                           child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                element.isClaimable ? 'CLAIM' : 'GET CLOSER',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      element.isClaimable ? Icons.touch_app_rounded : Icons.near_me_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Text(
+                                      element.isClaimable ? 'TAP TO CLAIM' : 'GET CLOSER',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                '${element.distance.toStringAsFixed(1)}m',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.1),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.location_on_rounded,
+                                      color: Colors.white,
+                                      size: 12,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${element.distance.toStringAsFixed(1)}m away',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -804,30 +1124,86 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             ),
             const SizedBox(height: 16),
             
-            // Proximity Hint
+            // Enhanced Proximity Hint with glassmorphism
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
-                  Text(
-                    proximityHint,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.radar_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          proximityHint,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
                   if (arElements.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${arElements.length} NFT${arElements.length > 1 ? 's' : ''} nearby',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.visibility_rounded,
+                            color: AppTheme.primaryColor,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${arElements.length} NFT${arElements.length > 1 ? 's' : ''} in view',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -941,7 +1317,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withOpacity(0.7),
+              Colors.black.withValues(alpha: 0.7),
             ],
           ),
         ),
@@ -1220,6 +1596,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
+
+  
   @override
   void dispose() {
     // Remove all callbacks to prevent setState calls after dispose
@@ -1231,11 +1609,20 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     arService.onClaimedBoundariesUpdate = null;
     arService.onPositionUpdate = null;
     
+    // Cancel timers and subscriptions
+    _arUpdateTimer?.cancel();
+    _gyroscopeSubscription?.cancel();
+    _magnetometerSubscription?.cancel();
+    
     // Dispose controllers
     confettiController.dispose();
     pulseController.dispose();
     rotationController.dispose();
     _cameraController?.dispose();
+    
+    // Clear image caches
+    _nftImageCache.clear();
+    _imageCacheTimestamp.clear();
     
     // Dispose AR service last
     arService.dispose();

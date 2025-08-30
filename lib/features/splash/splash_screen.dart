@@ -73,9 +73,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primaryColor.withOpacity(0.1),
-              AppTheme.secondaryColor.withOpacity(0.1),
-              AppTheme.accentColor.withOpacity(0.1),
+              AppTheme.primaryColor.withValues(alpha: 0.1),
+              AppTheme.secondaryColor.withValues(alpha: 0.1),
+              AppTheme.accentColor.withValues(alpha: 0.1),
             ],
           ),
         ),
@@ -106,13 +106,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         borderRadius: BorderRadius.circular(25),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.4),
+                            color: AppTheme.primaryColor.withValues(alpha: 0.4),
                             blurRadius: 25,
                             spreadRadius: 8,
                             offset: const Offset(0, 8),
                           ),
                           BoxShadow(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             blurRadius: 10,
                             spreadRadius: 2,
                             offset: const Offset(0, -2),
@@ -154,7 +154,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                   Shadow(
                                     offset: const Offset(0, 2),
                                     blurRadius: 4,
-                                    color: Colors.black.withOpacity(0.3),
+                                    color: Colors.black.withValues(alpha: 0.3),
                                   ),
                                 ],
                               ),
@@ -164,10 +164,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
+                                color: Colors.white.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
+                                  color: Colors.white.withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
@@ -214,7 +214,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             valueColor: AlwaysStoppedAnimation<Color>(
                               Colors.white,
                             ),
-                            backgroundColor: Colors.white.withOpacity(0.2),
+                            backgroundColor: Colors.white.withValues(alpha: 0.2),
                           ),
                         ),
                         SizedBox(height: screenHeight * 0.02),

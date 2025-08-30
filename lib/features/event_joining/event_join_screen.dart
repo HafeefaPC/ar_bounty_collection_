@@ -33,8 +33,8 @@ class _EventJoinScreenState extends ConsumerState<EventJoinScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primaryColor.withOpacity(0.1),
-              AppTheme.secondaryColor.withOpacity(0.1),
+              AppTheme.primaryColor.withValues(alpha: 0.1),
+              AppTheme.secondaryColor.withValues(alpha: 0.1),
             ],
           ),
         ),
@@ -71,7 +71,7 @@ class _EventJoinScreenState extends ConsumerState<EventJoinScreen> {
                           borderRadius: BorderRadius.circular(25),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              color: AppTheme.primaryColor.withValues(alpha: 0.3),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),

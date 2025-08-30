@@ -1,14 +1,13 @@
 import 'dart:convert';
+import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import 'package:face_reflector/shared/models/user.dart';
 import 'package:face_reflector/shared/models/goodie.dart';
 
 class StorageService {
   static Database? _database;
   static const String _userKey = 'user';
-  static const String _claimedGoodiesKey = 'claimed_goodies';
 
   Future<Database> get database async {
     if (_database != null) return _database!;

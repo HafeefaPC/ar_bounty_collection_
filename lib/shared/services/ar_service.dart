@@ -162,11 +162,11 @@ class ARService {
 
     // If no boundary is within claiming distance, show proximity hint for closest one
     if (closestBoundary != null) {
-      proximityHint = closestBoundary!.getProximityHint(
+      proximityHint = closestBoundary.getProximityHint(
         _currentPosition!.latitude,
         _currentPosition!.longitude,
       );
-      print('Closest boundary: ${closestBoundary!.name} at ${closestDistance.toStringAsFixed(2)}m');
+      print('Closest boundary: ${closestBoundary.name} at ${closestDistance.toStringAsFixed(2)}m');
     } else {
       proximityHint = 'No unclaimed boundaries found';
     }

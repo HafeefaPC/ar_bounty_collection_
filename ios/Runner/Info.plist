@@ -45,5 +45,23 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>core</string>
+		<string>metamask</string>
+		<string>trust</string>
+		<string>safe</string>
+		<string>rainbow</string>
+		<string>phantom</string>
+		<string>cbwallet</string>
+		<string>solflare</string>
+		<string>imtokenv2</string>
+		<string>1inch</string>
+		<string>zerion</string>
+		<string>argent</string>
+		<string>dharma</string>
+		<string>pillar</string>
+		<string>gnosis-safe</string>
+	</array>
 </dict>
 </plist>

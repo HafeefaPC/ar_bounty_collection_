@@ -1,5 +1,4 @@
 import 'package:uuid/uuid.dart';
-import 'goodie.dart';
 
 class User {
   final String id;
