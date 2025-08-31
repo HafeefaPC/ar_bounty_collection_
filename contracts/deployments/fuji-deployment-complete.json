@@ -1,0 +1,24 @@
+{
+  "network": "fuji",
+  "deployer": "0x84efBdc3146C76066591496A34e08b4e12fe8d2F",
+  "contracts": {
+    "EventFactory": "0xd65Ca26e5BD94C3974E90C48D6F05Cc25dC90ae2",
+    "BoundaryNFT": "0xD94eC54F0C26c9572eb287e66C6159D6650D4ba1",
+    "ClaimVerification": "0x413024C69862398AeEeb79829C39595e5B4E5ee6"
+  },
+  "deployedAt": "2025-08-31T06:00:01.910Z",
+  "chainId": 43113,
+  "roles": {
+    "EventFactory": {
+      "ORGANIZER_ROLE": "0xD94eC54F0C26c9572eb287e66C6159D6650D4ba1"
+    },
+    "BoundaryNFT": {
+      "MINTER_ROLE": "0xd65Ca26e5BD94C3974E90C48D6F05Cc25dC90ae2"
+    },
+    "ClaimVerification": {
+      "trustedSigner": "0x84efBdc3146C76066591496A34e08b4e12fe8d2F",
+      "ORACLE_ROLE": "0x84efBdc3146C76066591496A34e08b4e12fe8d2F",
+      "VERIFIER_ROLE": "0x84efBdc3146C76066591496A34e08b4e12fe8d2F"
+    }
+  }
+}

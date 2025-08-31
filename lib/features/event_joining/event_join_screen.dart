@@ -6,7 +6,9 @@ import 'package:face_reflector/core/theme/app_theme.dart';
 import 'package:face_reflector/core/providers/providers.dart';
 
 class EventJoinScreen extends ConsumerStatefulWidget {
-  const EventJoinScreen({super.key});
+  final String? initialEventCode;
+  
+  const EventJoinScreen({super.key, this.initialEventCode});
 
   @override
   ConsumerState<EventJoinScreen> createState() => _EventJoinScreenState();
@@ -18,228 +20,331 @@ class _EventJoinScreenState extends ConsumerState<EventJoinScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Pre-fill event code if provided
+    if (widget.initialEventCode != null) {
+      _eventCodeController.text = widget.initialEventCode!;
+      // Automatically join the event after a short delay
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _joinEvent();
+          }
+        });
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _eventCodeController.dispose();
     super.dispose();
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryColor.withValues(alpha: 0.1),
-              AppTheme.secondaryColor.withValues(alpha: 0.1),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                // Header
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => context.go('/wallet/options'),
-                      icon: const Icon(Icons.arrow_back_ios),
-                      color: Colors.grey[600],
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    resizeToAvoidBottomInset: true,
+    body: Container(
+      decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Retro Header
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      borderRadius: BorderRadius.circular(0), // Pixelated
+                      border: Border.all(
+                        color: AppTheme.textColor.withOpacity(0.3),
+                        width: 2,
+                      ),
                     ),
-                    const Spacer(),
-                  ],
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Main Content
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Icon
+                    child: IconButton(
+                      onPressed: () => context.go('/wallet/options'),
+                      icon: Icon(Icons.arrow_back_ios, color: AppTheme.textColor),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTheme.surfaceColor,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
+            ),
+            
+            // Scrollable Main Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    
+                    // Retro Icon
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.retroGradient,
+                        borderRadius: BorderRadius.circular(0), // Pixelated
+                        border: Border.all(
+                          color: AppTheme.textColor,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.6),
+                            offset: const Offset(6, 6),
+                            blurRadius: 0,
+                          ),
+                          BoxShadow(
+                            color: AppTheme.secondaryColor.withOpacity(0.4),
+                            offset: const Offset(3, 3),
+                            blurRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.qr_code_scanner_rounded,
+                        size: 50,
+                        color: AppTheme.backgroundColor,
+                      ),
+                    ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Retro Title
+                    Text(
+                      'JOIN EVENT',
+                      style: AppTheme.retroTitle.copyWith(
+                        fontSize: 28,
+                        color: AppTheme.textColor,
+                        shadows: [
+                          Shadow(
+                            offset: const Offset(3, 3),
+                            blurRadius: 0,
+                            color: AppTheme.primaryColor,
+                          ),
+                          Shadow(
+                            offset: const Offset(6, 6),
+                            blurRadius: 0,
+                            color: AppTheme.secondaryColor,
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Retro Description
+                    Text(
+                      'Enter the event code provided by the organizer to start claiming goodies',
+                      textAlign: TextAlign.center,
+                      style: AppTheme.retroBody.copyWith(
+                        fontSize: 16,
+                        color: AppTheme.textColor.withOpacity(0.8),
+                        height: 1.5,
+                      ),
+                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3),
+                    
+                    const SizedBox(height: 48),
+                    
+                    // Auto-join message if initial event code is provided
+                    if (widget.initialEventCode != null) ...[
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 24),
                         decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                              blurRadius: 20,
-                              spreadRadius: 5,
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(0),
+                          border: Border.all(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              color: AppTheme.primaryColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'AUTO-JOINING EVENT: ${widget.initialEventCode}',
+                                style: AppTheme.retroButton.copyWith(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 14,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.qr_code_scanner_rounded,
-                          size: 50,
-                          color: Colors.white,
-                        ),
-                      ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
-                      
-                      const SizedBox(height: 32),
-                      
-                      // Title
-                      Text(
-                        'Join Event',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Inter',
-                          color: Colors.grey[800],
-                        ),
-                      ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Description
-                      Text(
-                        'Enter the event code provided by the organizer to start claiming goodies',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                          fontFamily: 'Inter',
-                          height: 1.5,
-                        ),
-                      ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3),
-                      
-                      const SizedBox(height: 48),
-                      
-                      // Form
-                      Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            // Event Code Input
-                            TextFormField(
-                              controller: _eventCodeController,
-                              decoration: InputDecoration(
-                                labelText: 'Event Code',
-                                hintText: 'e.g., TECH24',
-                                prefixIcon: const Icon(Icons.qr_code),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
+                      ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.3),
+                    ],
+                    
+                    // Retro Form
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          // Retro Event Code Input
+                          TextFormField(
+                            controller: _eventCodeController,
+                            decoration: AppTheme.retroInputDecoration(
+                              labelText: 'EVENT CODE',
+                              hintText: 'e.g., TECH24',
+                              prefixIcon: Icons.qr_code,
+                            ),
+                            textCapitalization: TextCapitalization.characters,
+                            style: AppTheme.retroBody.copyWith(
+                              color: AppTheme.textColor,
+                              fontSize: 16,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter an event code';
+                              }
+                              if (value.length < 4) {
+                                return 'Event code must be at least 4 characters';
+                              }
+                              return null;
+                            },
+                          ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Retro Join Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _joinEvent,
+                              style: AppTheme.retroPrimaryButton.copyWith(
+                                backgroundColor: MaterialStateProperty.all(AppTheme.primaryColor),
+                                foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
                               ),
-                              textCapitalization: TextCapitalization.characters,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter an event code';
-                                }
-                                if (value.length < 4) {
-                                  return 'Event code must be at least 4 characters';
-                                }
-                                return null;
-                              },
-                            ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3),
-                            
-                            const SizedBox(height: 32),
-                            
-                            // Join Button
+                              child: _isLoading
+                                  ? Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              AppTheme.backgroundColor,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'JOINING...',
+                                          style: AppTheme.retroButton.copyWith(
+                                            fontSize: 16,
+                                            color: AppTheme.backgroundColor,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.play_arrow_rounded, color: AppTheme.backgroundColor),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'JOIN EVENT',
+                                          style: AppTheme.retroButton.copyWith(
+                                            fontSize: 16,
+                                            color: AppTheme.backgroundColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.3),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Demo Event Button
+                          if (widget.initialEventCode == null) // Only show if no initial event code
                             SizedBox(
                               width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _joinEvent,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 20),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  elevation: 0,
+                              child: OutlinedButton(
+                                onPressed: _isLoading ? null : _joinDemoEvent,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  side: BorderSide(color: AppTheme.secondaryColor, width: 2),
+                                  backgroundColor: Colors.transparent,
                                 ),
-                                child: _isLoading
-                                    ? Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Text(
-                                            'Joining...',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Inter',
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.play_arrow_rounded),
-                                          const SizedBox(width: 12),
-                                          const Text(
-                                            'Join Event',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Inter',
-                                            ),
-                                          ),
-                                        ],
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.sports_esports,
+                                      color: AppTheme.secondaryColor,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'TRY DEMO EVENT (TECH24)',
+                                      style: AppTheme.retroButton.copyWith(
+                                        color: AppTheme.secondaryColor,
+                                        fontSize: 14,
+                                        letterSpacing: 1.0,
                                       ),
-                              ),
-                            ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.3),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // Demo Event Button
-                            TextButton(
-                              onPressed: () => _joinDemoEvent(),
-                              child: Text(
-                                'Try Demo Event (TECH24)',
-                                style: TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 14,
-                                  fontFamily: 'Inter',
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ).animate().fadeIn(delay: 1000.ms),
-                          ],
-                        ),
+                            ).animate().fadeIn(delay: 1000.ms).slideY(begin: 0.3),
+                        ],
                       ),
-                    ],
+                    ),
+                    
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Retro Footer
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(0), // Pixelated
+                  border: Border.all(
+                    color: AppTheme.accentColor,
+                    width: 1,
                   ),
                 ),
-                
-                // Footer
-                Text(
+                child: Text(
                   'Make sure you\'re at the event venue to claim goodies',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: AppTheme.retroBody.copyWith(
                     fontSize: 12,
-                    color: Colors.grey[500],
-                    fontFamily: 'Inter',
+                    color: AppTheme.textColor.withOpacity(0.7),
                   ),
-                ).animate().fadeIn(delay: 1200.ms),
-              ],
+                ),
+              ).animate().fadeIn(delay: 1200.ms),
             ),
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _joinEvent() async {
     if (!_formKey.currentState!.validate()) return;
@@ -264,6 +369,7 @@ class _EventJoinScreenState extends ConsumerState<EventJoinScreen> {
           SnackBar(
             content: Text('Event not found: $e'),
             backgroundColor: AppTheme.errorColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
           ),
         );
       }

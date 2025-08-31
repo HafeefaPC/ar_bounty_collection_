@@ -13,7 +13,7 @@ import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/retro_theme.dart';
 
 // AR Element class for positioning NFT images in 3D space
 class ARElement {
@@ -34,21 +34,23 @@ class ARElement {
   });
 }
 
-class ARViewScreen extends ConsumerStatefulWidget {
+class RetroARViewScreen extends ConsumerStatefulWidget {
   final String eventCode;
 
-  const ARViewScreen({super.key, required this.eventCode});
+  const RetroARViewScreen({super.key, required this.eventCode});
 
   @override
-  ConsumerState<ARViewScreen> createState() => _ARViewScreenState();
+  ConsumerState<RetroARViewScreen> createState() => _RetroARViewScreenState();
 }
 
-class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProviderStateMixin {
+class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen> 
+    with TickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   
   late ARService arService;
   late SupabaseService supabaseService;
+  late WalletService walletService;
 
   Event? currentEvent;
   List<Boundary> boundaries = [];
@@ -58,10 +60,9 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   // UI State
   bool isLoading = true;
   bool isCameraInitialized = false;
-  String proximityHint = "Initializing camera...";
+  String proximityHint = "▸ INITIALIZING AR SYSTEM...";
   int claimedCount = 0;
   int totalBoundaries = 0;
-  bool showClaimedBoundaries = false;
   Boundary? detectedBoundary;
   
   // Performance optimization
@@ -69,7 +70,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
   
-  // Enhanced NFT image cache with memory management
+  // Enhanced NFT image cache
   final Map<String, Widget> _nftImageCache = {};
   final Map<String, DateTime> _imageCacheTimestamp = {};
   static const int _maxCacheSize = 50;
@@ -78,9 +79,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   // AR Positioning and Sensors
   double? _currentLatitude;
   double? _currentLongitude;
-  double _deviceAzimuth = 0.0; // Device heading in degrees
-  // Note: These are updated by sensors but not used in current AR implementation
-  // They could be used for advanced AR positioning in future versions
+  double _deviceAzimuth = 0.0;
   
   // AR Elements positioning
   List<ARElement> arElements = [];
@@ -89,8 +88,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   late ConfettiController confettiController;
   late AnimationController pulseController;
   late Animation<double> pulseAnimation;
-  late AnimationController rotationController;
-  late Animation<double> rotationAnimation;
+  late AnimationController scanlineController;
+  late Animation<double> scanlineAnimation;
 
   @override
   void initState() {
@@ -105,30 +104,31 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
   void _initializeServices() {
     arService = ARService();
     supabaseService = SupabaseService();
+    walletService = WalletService();
   }
 
   void _setupAnimations() {
     confettiController = ConfettiController(duration: const Duration(seconds: 3));
     
-    // Smooth rotation animation for NFT images (instead of bouncing)
-    rotationController = AnimationController(
-      duration: const Duration(seconds: 8), // Very slow, elegant rotation
-      vsync: this,
-    );
-    rotationAnimation = Tween<double>(begin: 0, end: 2 * pi).animate(
-      CurvedAnimation(parent: rotationController, curve: Curves.linear),
-    );
-    rotationController.repeat(); // Continuous rotation
-
-    // Pulse animation for claimable boundaries
+    // Retro scanning pulse animation
     pulseController = AnimationController(
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: pulseController, curve: Curves.easeInOut),
     );
     pulseController.repeat(reverse: true);
+
+    // Scanline animation for retro effect
+    scanlineController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    scanlineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: scanlineController, curve: Curves.linear),
+    );
+    scanlineController.repeat();
   }
 
   Future<void> _initializeCamera() async {
@@ -143,26 +143,25 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         await _cameraController!.initialize();
         setState(() {
           isCameraInitialized = true;
+          proximityHint = "▸ AR CAMERA ONLINE - SCANNING...";
         });
       }
     } catch (e) {
       print('Error initializing camera: $e');
+      setState(() {
+        proximityHint = "▸ ERROR: CAMERA INIT FAILED";
+      });
     }
   }
 
   void _initializeSensors() {
-    // Throttled sensor updates for better performance
     _gyroscopeSubscription = gyroscopeEventStream().listen((GyroscopeEvent event) {
-      // Future: Use pitch and roll for advanced AR positioning
-      // Currently only using azimuth for horizontal positioning
       _throttledARUpdate();
     });
 
-    // Listen to compass/magnetometer for heading with throttling
     _magnetometerSubscription = magnetometerEventStream().listen((MagnetometerEvent event) {
-      // Calculate azimuth from magnetometer data
       double azimuth = atan2(event.y, event.x) * 180 / pi;
-      if ((azimuth - _deviceAzimuth).abs() > 2.0) { // Only update if significant change
+      if ((azimuth - _deviceAzimuth).abs() > 2.0) {
         setState(() {
           _deviceAzimuth = azimuth;
         });
@@ -188,55 +187,45 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     List<ARElement> newElements = [];
     
     for (Boundary boundary in boundaries) {
-      // Skip if already claimed by this user
-      if (claimedBoundaries.any((claimed) => claimed.id == boundary.id)) continue;
-      
-      // Skip if already claimed by someone else
-      if (boundary.isClaimed && boundary.claimedBy != null) continue;
+      // Skip if already claimed by anyone
+      if (boundary.isClaimed) continue;
       
       double distance = boundary.distanceFrom(_currentLatitude!, _currentLongitude!);
       
-      // Only show boundaries within 2 meters (configurable)
-      if (distance > 2.0) continue;
+      // Only show boundaries within detection range
+      if (distance > 10.0) continue;
       
-      // Calculate bearing to boundary
-      double bearing = _calculateBearing(_currentLatitude!, _currentLongitude!, 
-                                       boundary.latitude, boundary.longitude);
-      
-      // Calculate relative angle from device heading
+      // Calculate bearing and relative angle
+      double bearing = _calculateBearing(
+        _currentLatitude!, _currentLongitude!, 
+        boundary.latitude, boundary.longitude
+      );
       double relativeAngle = bearing - _deviceAzimuth;
       
-      // Normalize angle to -180 to 180 degrees
-      while (relativeAngle > 180) {
-        relativeAngle -= 360;
-      }
-      while (relativeAngle < -180) {
-        relativeAngle += 360;
-      }
+      // Normalize angle
+      while (relativeAngle > 180) relativeAngle -= 360;
+      while (relativeAngle < -180) relativeAngle += 360;
       
-      // Only show if within 90 degrees of device heading (field of view)
+      // Only show if within field of view
       if (relativeAngle.abs() > 90) continue;
       
-      // Convert to screen coordinates (improved 3D projection)
+      // Calculate screen coordinates
       double screenWidth = MediaQuery.of(context).size.width;
       double screenHeight = MediaQuery.of(context).size.height;
       
-      // Map angle to screen X position (center is 0 degrees)
       double screenX = screenWidth / 2 + (relativeAngle * screenWidth / 180);
+      double screenY = screenHeight * 0.4 + (distance * 15);
       
-      // Map distance to screen Y position (closer = higher on screen)
-      double screenY = screenHeight * 0.3 + (distance * 20); // Closer objects appear higher
-      
-      // Add some randomness for natural positioning
-      screenX += (Random().nextDouble() - 0.5) * 20;
-      screenY += (Random().nextDouble() - 0.5) * 10;
+      // Add some variation for natural positioning
+      screenX += (Random().nextDouble() - 0.5) * 30;
+      screenY += (Random().nextDouble() - 0.5) * 20;
       
       // Clamp to screen bounds
-      screenX = screenX.clamp(75.0, screenWidth - 75.0);
-      screenY = screenY.clamp(150.0, screenHeight - 250.0);
+      screenX = screenX.clamp(80.0, screenWidth - 80.0);
+      screenY = screenY.clamp(180.0, screenHeight - 280.0);
       
-      bool isClaimable = distance <= boundary.radius;
-      bool isVisible = distance <= 5.0;
+      bool isClaimable = distance <= (boundary.radius ?? 2.0);
+      bool isVisible = distance <= 15.0;
       
       newElements.add(ARElement(
         boundary: boundary,
@@ -250,6 +239,17 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     
     setState(() {
       arElements = newElements;
+      if (arElements.isNotEmpty) {
+        final closest = arElements.reduce((a, b) => a.distance < b.distance ? a : b);
+        if (closest.isClaimable) {
+          proximityHint = "▸ TARGET ACQUIRED - TAP TO CLAIM!";
+          detectedBoundary = closest.boundary;
+        } else {
+          proximityHint = "▸ SCANNING... ${closest.distance.toStringAsFixed(1)}M TO TARGET";
+        }
+      } else {
+        proximityHint = "▸ NO TARGETS IN RANGE - KEEP EXPLORING";
+      }
     });
   }
 
@@ -267,31 +267,64 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
 
   Future<void> _loadEventData() async {
     try {
-      setState(() => isLoading = true);
+      print('=== AR SCREEN: LOADING EVENT DATA ===');
+      print('Received event code: "${widget.eventCode}"');
+      print('Event code length: ${widget.eventCode.length}');
+      print('Event code is empty: ${widget.eventCode.isEmpty}');
       
-      print('Loading event with code: ${widget.eventCode}');
+      setState(() {
+        isLoading = true;
+        proximityHint = "▸ LOADING EVENT DATA...";
+      });
       
-      // Load event from Supabase
+      if (widget.eventCode.isEmpty) {
+        print('ERROR: Event code is empty!');
+        setState(() {
+          isLoading = false;
+          proximityHint = "▸ ERROR: NO EVENT CODE PROVIDED";
+        });
+        return;
+      }
+      
+      // First, let's see what event codes are available in the database
+      print('=== CHECKING AVAILABLE EVENT CODES ===');
+      final availableEventCodes = await supabaseService.getAllEventCodes();
+      print('Available event codes: $availableEventCodes');
+      
+      // Test if the event code exists before trying to load it
+      print('Testing if event code exists: ${widget.eventCode}');
+      final eventExists = await supabaseService.testEventCodeExists(widget.eventCode);
+      
+      if (!eventExists) {
+        print('ERROR: Event code ${widget.eventCode} does not exist in database');
+        print('Available event codes: $availableEventCodes');
+        setState(() {
+          isLoading = false;
+          proximityHint = "▸ ERROR: EVENT CODE NOT FOUND";
+        });
+        return;
+      }
+      
+      print('Event code exists, proceeding to load event data...');
+      print('Calling getEventByCode with: ${widget.eventCode}');
+      
       currentEvent = await supabaseService.getEventByCode(widget.eventCode);
       
+      print('getEventByCode result: ${currentEvent != null ? "SUCCESS" : "FAILED"}');
       if (currentEvent != null) {
-        print('Event loaded successfully: ${currentEvent!.name}');
-        print('Event ID: ${currentEvent!.id}');
-        print('Event has ${currentEvent!.boundaries.length} boundaries');
+        print('Event loaded successfully:');
+        print('  - Name: ${currentEvent!.name}');
+        print('  - ID: ${currentEvent!.id}');
+        print('  - Event Code: ${currentEvent!.eventCode}');
+        print('  - Boundaries count: ${currentEvent!.boundaries.length}');
         
         boundaries = currentEvent!.boundaries;
         totalBoundaries = boundaries.length;
         
-        // Log boundary details for debugging
-        for (int i = 0; i < boundaries.length; i++) {
-          final boundary = boundaries[i];
-          print('Boundary $i: ${boundary.name} at ${boundary.latitude}, ${boundary.longitude} (radius: ${boundary.radius}m, claimed: ${boundary.isClaimed}, eventId: ${boundary.eventId})');
-        }
+        // Load claimed boundaries for this event
+        await _loadClaimedBoundaries();
         
-        // Set event in AR service (now async)
         await arService.setEvent(currentEvent!);
-        
-        // Set up AR service callbacks
         arService.onBoundaryDetected = _onBoundaryDetected;
         arService.onBoundaryClaimed = _onBoundaryClaimed;
         arService.onProximityUpdate = _onProximityUpdate;
@@ -300,26 +333,51 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
         arService.onClaimedBoundariesUpdate = _onClaimedBoundariesUpdate;
         arService.onPositionUpdate = _onPositionUpdate;
         
-        // Initialize AR service
         await arService.initializeAR();
         
         setState(() {
           isLoading = false;
-          proximityHint = 'Event loaded! Exploring for boundaries...';
+          proximityHint = "▸ EVENT LOADED - AR ACTIVE";
         });
       } else {
-        print('Event not found for code: ${widget.eventCode}');
+        print('ERROR: getEventByCode returned null even though event exists');
+        print('This suggests an issue in the data processing or conversion');
         setState(() {
           isLoading = false;
-          proximityHint = "Event not found! Check the event code.";
+          proximityHint = "▸ ERROR: EVENT CODE INVALID";
         });
       }
     } catch (e) {
       print('Error loading event: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Full error details: ${e.toString()}');
       setState(() {
         isLoading = false;
-        proximityHint = "Error loading event: $e";
+        proximityHint = "▸ ERROR: FAILED TO LOAD EVENT";
       });
+    }
+  }
+
+  Future<void> _loadClaimedBoundaries() async {
+    try {
+      final claimed = await supabaseService.getClaimedBoundariesForEvent(currentEvent!.id);
+      setState(() {
+        claimedBoundaries = claimed;
+        claimedCount = claimed.length;
+        
+        // Update boundaries list to reflect claimed status
+        for (int i = 0; i < boundaries.length; i++) {
+          final claimedBoundary = claimed.firstWhere(
+            (c) => c.id == boundaries[i].id,
+            orElse: () => boundaries[i],
+          );
+          if (claimedBoundary.isClaimed) {
+            boundaries[i] = claimedBoundary;
+          }
+        }
+      });
+    } catch (e) {
+      print('Error loading claimed boundaries: $e');
     }
   }
 
@@ -327,9 +385,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     if (!mounted) return;
     setState(() {
       detectedBoundary = boundary;
-      proximityHint = "Boundary detected! Tap to claim!";
+      proximityHint = "▸ BOUNDARY DETECTED - READY TO CLAIM!";
     });
-    pulseController.forward();
   }
 
   void _onBoundaryClaimed(Boundary boundary) {
@@ -338,28 +395,23 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
       claimedBoundaries.add(boundary);
       claimedCount = claimedBoundaries.length;
       detectedBoundary = null;
+      proximityHint = "▸ CLAIM SUCCESSFUL - KEEP EXPLORING!";
       
-      // Mark the boundary as claimed in the main boundaries list
       final index = boundaries.indexWhere((b) => b.id == boundary.id);
       if (index != -1) {
         boundaries[index] = boundaries[index].copyWith(isClaimed: true);
       }
     });
     
-    // Show confetti
     confettiController.play();
-    
-    // Show success dialog
-    _showClaimSuccessDialog(boundary);
-    
-    // Update AR positions to remove claimed boundary
+    _showRetroClaimSuccessDialog(boundary);
     _updateARPositions();
   }
 
   void _onProximityUpdate(String hint) {
     if (!mounted) return;
     setState(() {
-      proximityHint = hint;
+      proximityHint = "▸ $hint";
     });
   }
 
@@ -395,317 +447,248 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     _updateARPositions();
   }
 
-  // Debug method to reset boundaries for testing
-  Future<void> _resetBoundariesForTesting() async {
-    if (currentEvent == null) return;
-    
+  Future<void> _claimBoundary(ARElement element) async {
     try {
-      await supabaseService.resetEventBoundaries(currentEvent!.id);
-      
-      // Reload event data
-      await _loadEventData();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Boundaries reset successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error resetting boundaries: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+      setState(() {
+        proximityHint = "▸ CLAIMING BOUNDARY...";
+      });
 
-  // Debug method to fix incorrectly claimed boundaries
-  Future<void> _fixIncorrectlyClaimedBoundaries() async {
-    if (currentEvent == null) return;
-    
-    try {
-      await supabaseService.fixIncorrectlyClaimedBoundaries(currentEvent!.id);
+      final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet_${DateTime.now().millisecondsSinceEpoch}';
       
-      // Reload event data
-      await _loadEventData();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Incorrectly claimed boundaries fixed!'),
-          backgroundColor: Colors.orange,
-        ),
+      // Enhanced claim with all necessary database updates
+      final success = await supabaseService.claimBoundaryWithFullUpdate(
+        boundaryId: element.boundary.id,
+        claimedBy: walletAddress,
+        distance: element.distance,
+        claimTxHash: 'tx_${DateTime.now().millisecondsSinceEpoch}', // Would be real tx hash
+        nftMetadata: {
+          'name': element.boundary.name,
+          'description': element.boundary.description,
+          'image': element.boundary.imageUrl,
+          'claimed_at': DateTime.now().toIso8601String(),
+          'location': {
+            'lat': element.boundary.latitude,
+            'lng': element.boundary.longitude,
+          },
+          'event': currentEvent?.name,
+        },
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fixing boundaries: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Debug method to check boundary status
-  Future<void> _checkBoundaryStatus() async {
-    if (currentEvent == null) return;
-    
-    try {
-      final status = await supabaseService.getBoundaryStatus(currentEvent!.id);
       
-      String message = 'Boundary Status:\n';
-      for (final boundary in status) {
-        message += '${boundary['name']}: ${boundary['is_claimed'] ? 'Claimed' : 'Available'}\n';
-        if (boundary['is_claimed'] == true) {
-          message += '  By: ${boundary['claimed_by'] ?? 'Unknown'}\n';
-          message += '  At: ${boundary['claimed_at'] ?? 'Unknown'}\n';
-        }
+      if (success) {
+        // Update local state
+        final updatedBoundary = element.boundary.copyWith(
+          isClaimed: true,
+          claimedBy: walletAddress,
+          claimedAt: DateTime.now(),
+        );
+        
+        arService.claimBoundary(updatedBoundary);
+        
+        setState(() {
+          final index = boundaries.indexWhere((b) => b.id == element.boundary.id);
+          if (index != -1) {
+            boundaries[index] = updatedBoundary;
+          }
+          claimedBoundaries.add(updatedBoundary);
+          claimedCount = claimedBoundaries.length;
+        });
+        
+        _updateARPositions();
+      } else {
+        setState(() {
+          proximityHint = "▸ CLAIM FAILED - ALREADY CLAIMED";
+        });
+        
+        // Reload event data to sync with server
+        await _loadEventData();
       }
-      
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Boundary Status'),
-          content: SingleChildScrollView(
-            child: Text(message),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error checking status: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('Error claiming boundary: $e');
+      setState(() {
+        proximityHint = "▸ ERROR: CLAIM FAILED";
+      });
     }
   }
 
-  void _showClaimSuccessDialog(Boundary boundary) {
+  void _showRetroClaimSuccessDialog(Boundary boundary) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.celebration, color: AppTheme.primaryColor),
-            const SizedBox(width: 8),
-            const Text('Boundary Claimed!'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              boundary.name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(boundary.description),
-            const SizedBox(height: 16),
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Icon(
-                Icons.check_circle,
-                color: AppTheme.primaryColor,
-                size: 40,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Continue Exploring'),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: RetroTheme.primaryGreen,
+            border: Border.all(color: RetroTheme.brightGreen, width: 3),
           ),
-        ],
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: RetroTheme.darkGreen,
+              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Retro success header
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: RetroTheme.brightGreen,
+                    border: Border.all(color: RetroTheme.lightGreen, width: 2),
+                  ),
+                  child: Text(
+                    '>>> CLAIM SUCCESSFUL <<<',
+                    style: TextStyle(
+                      fontFamily: 'Courier',
+                      color: RetroTheme.darkGreen,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // NFT display
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: RetroTheme.brightGreen, width: 3),
+                    color: RetroTheme.primaryGreen,
+                  ),
+                  child: _buildPixelatedNFTImage(boundary.imageUrl),
+                ),
+                const SizedBox(height: 16),
+                
+                // Boundary info
+                Text(
+                  boundary.name.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: 'Courier',
+                    color: RetroTheme.brightGreen,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                
+                Text(
+                  boundary.description.toUpperCase(),
+                  style: TextStyle(
+                    fontFamily: 'Courier',
+                    color: RetroTheme.lightGreen,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                
+                // Retro continue button
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: RetroTheme.primaryGreen,
+                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                    ),
+                    child: Text(
+                      '[ CONTINUE ]',
+                      style: TextStyle(
+                        fontFamily: 'Courier',
+                        color: RetroTheme.brightGreen,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildNFTImage(String imageUrl) {
-    // Enhanced cache management with expiry and size limits
+  Widget _buildPixelatedNFTImage(String imageUrl) {
     if (_nftImageCache.containsKey(imageUrl)) {
       final timestamp = _imageCacheTimestamp[imageUrl];
       if (timestamp != null && DateTime.now().difference(timestamp) < _cacheExpiry) {
         return _nftImageCache[imageUrl]!;
-      } else {
-        // Remove expired cache entry
-        _nftImageCache.remove(imageUrl);
-        _imageCacheTimestamp.remove(imageUrl);
       }
-    }
-    
-    // Clean cache if it exceeds max size
-    if (_nftImageCache.length >= _maxCacheSize) {
-      _cleanImageCache();
     }
     
     Widget imageWidget;
     
-    // Handle different image URL types with Apple-style loading
     if (imageUrl.startsWith('http')) {
       imageWidget = Image.network(
         imageUrl,
         fit: BoxFit.cover,
-        cacheWidth: 300, // Optimize for AR display size
-        cacheHeight: 300,
+        filterQuality: FilterQuality.none, // Pixelated effect
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) {
-            // Cache the loaded image with timestamp
             _nftImageCache[imageUrl] = child;
             _imageCacheTimestamp[imageUrl] = DateTime.now();
             return child;
           }
           return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.primaryColor.withOpacity(0.05),
-                  AppTheme.secondaryColor.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
+            color: RetroTheme.primaryGreen,
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      strokeCap: StrokeCap.round,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
-                      color: AppTheme.primaryColor,
-                      backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Loading NFT',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor.withOpacity(0.7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'LOADING...',
+                style: TextStyle(
+                  fontFamily: 'Courier',
+                  color: RetroTheme.brightGreen,
+                  fontSize: 10,
+                ),
               ),
             ),
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          final defaultWidget = _buildDefaultNFTImage();
-          _nftImageCache[imageUrl] = defaultWidget;
-          _imageCacheTimestamp[imageUrl] = DateTime.now();
-          return defaultWidget;
-        },
-      );
-    } else if (imageUrl.startsWith('/')) {
-      imageWidget = Image.file(
-        File(imageUrl),
-        fit: BoxFit.cover,
-        cacheWidth: 300,
-        cacheHeight: 300,
-        errorBuilder: (context, error, stackTrace) {
-          final defaultWidget = _buildDefaultNFTImage();
-          _nftImageCache[imageUrl] = defaultWidget;
-          _imageCacheTimestamp[imageUrl] = DateTime.now();
-          return defaultWidget;
+          return _buildDefaultPixelatedNFT();
         },
       );
     } else {
-      imageWidget = _buildDefaultNFTImage();
+      imageWidget = _buildDefaultPixelatedNFT();
     }
     
-    // Cache the widget for performance with timestamp
-    _nftImageCache[imageUrl] = imageWidget;
-    _imageCacheTimestamp[imageUrl] = DateTime.now();
     return imageWidget;
   }
 
-  Widget _buildDefaultNFTImage() {
+  Widget _buildDefaultPixelatedNFT() {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryColor.withOpacity(0.08),
-            AppTheme.secondaryColor.withOpacity(0.08),
-            AppTheme.accentColor.withOpacity(0.05),
-          ],
-          stops: const [0.0, 0.7, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.primaryColor.withOpacity(0.15),
-          width: 1.5,
-        ),
-      ),
+      color: RetroTheme.primaryGreen,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
+                color: RetroTheme.brightGreen,
+                border: Border.all(color: RetroTheme.lightGreen, width: 1),
               ),
-              child: Icon(
-                Icons.collections_outlined,
-                color: AppTheme.primaryColor,
-                size: 28,
+              child: Center(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  color: RetroTheme.lightGreen,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.05),
-                    blurRadius: 4,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Text(
-                'NFT Collectible',
-                style: TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
+            const SizedBox(height: 4),
+            Text(
+              'NFT',
+              style: TextStyle(
+                fontFamily: 'Courier',
+                color: RetroTheme.brightGreen,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -714,122 +697,56 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  void _cleanImageCache() {
-    if (_nftImageCache.length <= _maxCacheSize ~/ 2) return;
-    
-    // Remove oldest entries
-    final sortedEntries = _imageCacheTimestamp.entries.toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-    
-    final entriesToRemove = sortedEntries.take(_nftImageCache.length - _maxCacheSize ~/ 2);
-    for (final entry in entriesToRemove) {
-      _nftImageCache.remove(entry.key);
-      _imageCacheTimestamp.remove(entry.key);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera View with Apple-style loading
+          // Camera View with retro overlay
           if (isCameraInitialized && _cameraController != null)
-            ClipRect(child: CameraPreview(_cameraController!))
-          else
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF000000),
-                    AppTheme.backgroundColor.withOpacity(0.95),
-                    const Color(0xFF000000),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.15),
-                            AppTheme.secondaryColor.withOpacity(0.15),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(32),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.2),
-                            blurRadius: 24,
-                            spreadRadius: 4,
+            Stack(
+              children: [
+                ClipRect(child: CameraPreview(_cameraController!)),
+                // Retro scanline effect
+                AnimatedBuilder(
+                  animation: scanlineAnimation,
+                  builder: (context, child) {
+                    return Positioned(
+                      top: MediaQuery.of(context).size.height * scanlineAnimation.value,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 2,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              RetroTheme.brightGreen.withOpacity(0.8),
+                              Colors.transparent,
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                      child: Icon(
-                        Icons.camera_alt_rounded,
-                        color: Colors.white,
-                        size: 56,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        color: AppTheme.primaryColor,
-                        backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
-                        strokeWidth: 3,
-                        strokeCap: StrokeCap.round,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Initializing AR Camera',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Preparing your AR experience...',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              ),
-            ),
+              ],
+            )
+          else
+            _buildRetroLoadingScreen(),
           
-          // AR Overlay for Positioned NFT Elements
-          _buildPositionedAROverlay(),
+          // AR Overlay
+          _buildRetroAROverlay(),
           
-          // Top UI Overlay
-          _buildTopOverlay(),
+          // Top UI
+          _buildRetroTopOverlay(),
           
-          // Bottom UI Overlay
-          _buildBottomOverlay(),
+          // Bottom UI
+          _buildRetroBottomOverlay(),
           
-          // Loading Overlay
-          if (isLoading) _buildLoadingOverlay(),
+          // Loading overlay
+          if (isLoading) _buildRetroLoadingOverlay(),
           
           // Confetti
           Align(
@@ -842,6 +759,7 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
               emissionFrequency: 0.05,
               numberOfParticles: 50,
               gravity: 0.1,
+              colors: [RetroTheme.brightGreen, RetroTheme.primaryGreen, RetroTheme.lightGreen],
             ),
           ),
         ],
@@ -849,210 +767,162 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  Widget _buildPositionedAROverlay() {
+  Widget _buildRetroLoadingScreen() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 3),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                    ),
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: scanlineController,
+                        builder: (context, child) {
+                          return Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: RetroTheme.primaryGreen.withOpacity(scanlineAnimation.value),
+                              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'INITIALIZING AR CAMERA',
+                    style: TextStyle(
+                      fontFamily: 'Courier',
+                      color: RetroTheme.brightGreen,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'LOADING SYSTEM MODULES...',
+                    style: TextStyle(
+                      fontFamily: 'Courier',
+                      color: RetroTheme.lightGreen,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRetroAROverlay() {
     return Stack(
       children: arElements.map((element) {
         if (!element.isVisible) return const SizedBox.shrink();
         
         return Positioned(
-          left: element.screenX - 75, // Center the element
-          top: element.screenY - 75,
+          left: element.screenX - 60,
+          top: element.screenY - 60,
           child: GestureDetector(
             onTap: () async {
               if (element.isClaimable) {
-                try {
-                  final walletService = WalletService();
-                  final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
-                  
-                  final success = await supabaseService.claimBoundaryForUser(
-                    element.boundary.id,
-                    walletAddress,
-                    element.distance,
-                  );
-                  
-                  if (success) {
-                    arService.claimBoundary(element.boundary);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to claim boundary. It may have been claimed by someone else.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error claiming boundary: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                await _claimBoundary(element);
               }
             },
             child: AnimatedBuilder(
-              animation: element.isClaimable ? pulseAnimation : rotationAnimation,
+              animation: element.isClaimable ? pulseAnimation : scanlineAnimation,
               builder: (context, child) {
-                return Transform.rotate(
-                  angle: element.isClaimable ? 0 : rotationAnimation.value,
-                  child: Transform.scale(
-                    scale: element.isClaimable ? pulseAnimation.value : 1.0,
-                    child: Column(
-                      children: [
-                        // Enhanced NFT Image Container with premium Apple-style design
-                        Container(
-                          width: 150,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: element.isClaimable 
-                                  ? [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor]
-                                  : [Colors.orange.shade300, Colors.orange.shade500, Colors.deepOrange.shade600],
-                              stops: const [0.0, 0.6, 1.0],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.4),
-                                blurRadius: 32,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 12),
-                              ),
-                              BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.15),
-                                blurRadius: 64,
-                                spreadRadius: 12,
-                                offset: const Offset(0, 0),
-                              ),
-                              // Inner highlight
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.2),
-                                blurRadius: 8,
-                                spreadRadius: -2,
-                                offset: const Offset(0, -4),
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            margin: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child: _buildNFTImage(element.boundary.imageUrl),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        // Premium Apple-style status display with glassmorphism
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: element.isClaimable 
-                                  ? [AppTheme.primaryColor, AppTheme.secondaryColor, AppTheme.accentColor]
-                                  : [Colors.orange.shade300, Colors.orange.shade500, Colors.deepOrange.shade600],
-                              stops: const [0.0, 0.6, 1.0],
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (element.isClaimable ? AppTheme.primaryColor : Colors.orange).withOpacity(0.3),
-                                blurRadius: 20,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 8),
-                              ),
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.1),
-                                blurRadius: 8,
-                                spreadRadius: -2,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      element.isClaimable ? Icons.touch_app_rounded : Icons.near_me_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Flexible(
-                                    child: Text(
-                                      element.isClaimable ? 'TAP TO CLAIM' : 'GET CLOSER',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.1),
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.location_on_rounded,
-                                      color: Colors.white,
-                                      size: 12,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${element.distance.toStringAsFixed(1)}m away',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                return Container(
+                  width: 120,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: element.isClaimable 
+                          ? RetroTheme.brightGreen 
+                          : RetroTheme.primaryGreen,
+                      width: element.isClaimable 
+                          ? 3 + (pulseAnimation.value * 2) 
+                          : 2,
                     ),
+                    color: element.isClaimable
+                        ? RetroTheme.darkGreen.withOpacity(0.8 + pulseAnimation.value * 0.2)
+                        : RetroTheme.darkGreen.withOpacity(0.6),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        color: element.isClaimable 
+                            ? RetroTheme.brightGreen 
+                            : RetroTheme.primaryGreen,
+                        child: Text(
+                          element.isClaimable ? 'TARGET' : 'DETECTED',
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            color: RetroTheme.darkGreen,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      
+                      // NFT Image
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: element.isClaimable 
+                                  ? RetroTheme.brightGreen 
+                                  : RetroTheme.primaryGreen,
+                              width: 1,
+                            ),
+                          ),
+                          child: _buildPixelatedNFTImage(element.boundary.imageUrl),
+                        ),
+                      ),
+                      
+                      // Action indicator
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        color: element.isClaimable 
+                            ? RetroTheme.brightGreen 
+                            : RetroTheme.primaryGreen,
+                        child: Text(
+                          element.isClaimable 
+                              ? 'TAP TO CLAIM' 
+                              : '${element.distance.toStringAsFixed(1)}M',
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            color: RetroTheme.darkGreen,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -1063,161 +933,169 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-
-
-  Widget _buildTopOverlay() {
+  Widget _buildRetroTopOverlay() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
             // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      arService.dispose();
+                      context.go('/wallet/options');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                      ),
+                      child: Text(
+                        '<<',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                                      child: IconButton(
-                      onPressed: () {
-                        // Stop AR service and go back
-                        arService.dispose();
-                        context.go('/wallet/options');
-                      },
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      currentEvent?.name ?? 'Event',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                      (currentEvent?.name ?? 'EVENT').toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Courier',
+                        color: RetroTheme.brightGreen,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showRetroEventInfo,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                      ),
+                      child: Text(
+                        'INFO',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: IconButton(
-                    onPressed: _showEventInfo,
-                    icon: const Icon(Icons.info, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Enhanced Proximity Hint with glassmorphism
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _testDatabaseConnection,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                      ),
+                      child: Text(
+                        'TEST',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Proximity hint with retro styling
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
               ),
               child: Column(
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withOpacity(0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.radar_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
+                      AnimatedBuilder(
+                        animation: scanlineAnimation,
+                        builder: (context, child) {
+                          return Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: RetroTheme.brightGreen.withOpacity(scanlineAnimation.value),
+                              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           proximityHint,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.2,
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            color: RetroTheme.brightGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],
                   ),
                   if (arElements.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
-                          width: 0.5,
-                        ),
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.lightGreen, width: 1),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.visibility_rounded,
-                            color: AppTheme.primaryColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${arElements.length} NFT${arElements.length > 1 ? 's' : ''} in view',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'TARGETS IN VIEW: ${arElements.length}',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.darkGreen,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             
-            // Progress Bar
+            // Progress display
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(15),
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
               ),
               child: Column(
                 children: [
@@ -1225,75 +1103,49 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Progress',
+                        'PROGRESS',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        claimedCount <= totalBoundaries 
-                            ? '$claimedCount/$totalBoundaries'
-                            : '$totalBoundaries/$totalBoundaries',
+                        '${claimedCount.clamp(0, totalBoundaries)}/$totalBoundaries',
                         style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 14,
+                          fontFamily: 'Courier',
+                          color: RetroTheme.lightGreen,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: totalBoundaries > 0 ? (claimedCount / totalBoundaries).clamp(0.0, 1.0) : 0,
-                    backgroundColor: Colors.white24,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  const SizedBox(height: 8),
-                  // Debug buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _resetBoundariesForTesting,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
+                  
+                  // Retro progress bar
+                  Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+                    ),
+                    child: Stack(
+                      children: [
+                        Container(color: RetroTheme.darkGreen),
+                        FractionallySizedBox(
+                          widthFactor: totalBoundaries > 0 
+                              ? (claimedCount / totalBoundaries).clamp(0.0, 1.0) 
+                              : 0,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: RetroTheme.brightGreen,
+                              border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                            ),
                           ),
-                          child: const Text('Reset All', style: TextStyle(fontSize: 10)),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _fixIncorrectlyClaimedBoundaries,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
-                          ),
-                          child: const Text('Fix Claims', style: TextStyle(fontSize: 10)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _checkBoundaryStatus,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: const Size(0, 30),
-                          ),
-                          child: const Text('Check Status', style: TextStyle(fontSize: 10)),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1304,56 +1156,69 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  Widget _buildBottomOverlay() {
+  Widget _buildRetroBottomOverlay() {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withValues(alpha: 0.7),
+              Colors.black.withOpacity(0.8),
             ],
           ),
         ),
         child: SafeArea(
           child: Row(
             children: [
-              // Claimed Boundaries Button
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showClaimedBoundaries,
-                  icon: const Icon(Icons.celebration),
-                  label: Text('Claimed ($claimedCount)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: GestureDetector(
+                  onTap: _showRetroClaimedBoundaries,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: RetroTheme.darkGreen,
+                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'CLAIMED ($claimedCount)',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
-              
-              // Event Info Button
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showEventInfo,
-                  icon: const Icon(Icons.info),
-                  label: const Text('Event Info'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: GestureDetector(
+                  onTap: _showRetroEventInfo,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: RetroTheme.darkGreen,
+                      border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'EVENT INFO',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.primaryGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1365,230 +1230,482 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-  Widget _buildLoadingOverlay() {
+  Widget _buildRetroLoadingOverlay() {
     return Container(
-      color: Colors.black87,
+      color: Colors.black.withOpacity(0.9),
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Loading Event...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: RetroTheme.darkGreen,
+            border: Border.all(color: RetroTheme.primaryGreen, width: 3),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: scanlineAnimation,
+                builder: (context, child) {
+                  return Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      color: RetroTheme.primaryGreen.withOpacity(scanlineAnimation.value * 0.5),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'AR',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.brightGreen,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Event Code: ${widget.eventCode}',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
+              const SizedBox(height: 16),
+              Text(
+                'LOADING EVENT DATA...',
+                style: TextStyle(
+                  fontFamily: 'Courier',
+                  color: RetroTheme.brightGreen,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'CODE: ${widget.eventCode}',
+                style: TextStyle(
+                  fontFamily: 'Courier',
+                  color: RetroTheme.lightGreen,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showClaimedBoundaries() {
-    showModalBottomSheet(
+  void _showRetroClaimedBoundaries() {
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.celebration, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Claimed Boundaries (${claimedBoundaries.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: RetroTheme.primaryGreen,
+            border: Border.all(color: RetroTheme.brightGreen, width: 3),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: RetroTheme.darkGreen,
+              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: RetroTheme.brightGreen,
+                    border: Border(
+                      bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
                     ),
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: claimedBoundaries.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.explore,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No boundaries claimed yet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Explore the event area to find and claim boundaries',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                  child: Row(
+                    children: [
+                      Text(
+                        '>>> CLAIMED NFTS <<<',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.darkGreen,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: claimedBoundaries.length,
-                      itemBuilder: (context, index) {
-                        final boundary = claimedBoundaries[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.green,
-                              child: Icon(
-                                Icons.check,
-                                color: Colors.white,
+                      const Spacer(),
+                      Text(
+                        '($claimedCount)',
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: RetroTheme.darkGreen,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: claimedBoundaries.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '?',
+                                    style: TextStyle(
+                                      fontFamily: 'Courier',
+                                      color: RetroTheme.primaryGreen,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            title: Text(boundary.name),
-                            subtitle: Text(boundary.description),
-                            trailing: Text(
-                              boundary.claimedAt?.toString().substring(0, 16) ?? '',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
+                              const SizedBox(height: 16),
+                              Text(
+                                'NO NFTS CLAIMED YET',
+                                style: TextStyle(
+                                  fontFamily: 'Courier',
+                                  color: RetroTheme.primaryGreen,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'EXPLORE THE AREA TO FIND TARGETS',
+                                style: TextStyle(
+                                  fontFamily: 'Courier',
+                                  color: RetroTheme.lightGreen,
+                                  fontSize: 10,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                        );
-                      },
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: claimedBoundaries.length,
+                          itemBuilder: (context, index) {
+                            final boundary = claimedBoundaries[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: RetroTheme.primaryGreen,
+                                border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                                    ),
+                                    child: _buildPixelatedNFTImage(boundary.imageUrl),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          boundary.name.toUpperCase(),
+                                          style: TextStyle(
+                                            fontFamily: 'Courier',
+                                            color: RetroTheme.darkGreen,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          boundary.description.toUpperCase(),
+                                          style: TextStyle(
+                                            fontFamily: 'Courier',
+                                            color: RetroTheme.darkGreen,
+                                            fontSize: 8,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: RetroTheme.brightGreen,
+                                      border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                                    ),
+                                    child: Text(
+                                      'CLAIMED',
+                                      style: TextStyle(
+                                        fontFamily: 'Courier',
+                                        color: RetroTheme.darkGreen,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '[ CLOSE ]',
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            color: RetroTheme.brightGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  void _showEventInfo() {
+  void _testDatabaseConnection() async {
+    try {
+      print('=== TESTING DATABASE CONNECTION ===');
+      
+      // Test basic connection
+      final connectionTest = await supabaseService.testDatabaseConnection();
+      print('Database connection test: ${connectionTest ? "SUCCESS" : "FAILED"}');
+      
+      // Get all event codes
+      final eventCodes = await supabaseService.getAllEventCodes();
+      print('Available event codes: $eventCodes');
+      
+      // Test specific event code
+      if (widget.eventCode.isNotEmpty) {
+        final eventExists = await supabaseService.testEventCodeExists(widget.eventCode);
+        print('Event code ${widget.eventCode} exists: $eventExists');
+      }
+      
+      // Show results in UI
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+              ),
+              child: Text(
+                'DB TEST: ${connectionTest ? "OK" : "FAILED"} | EVENTS: ${eventCodes.length}',
+                style: TextStyle(
+                  fontFamily: 'Courier',
+                  color: RetroTheme.brightGreen,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error testing database connection: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: RetroTheme.darkGreen,
+                border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+              ),
+              child: Text(
+                'DB TEST ERROR: $e',
+                style: TextStyle(
+                  fontFamily: 'Courier',
+                  color: RetroTheme.brightGreen,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRetroEventInfo() {
     if (currentEvent == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Event information not available'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: RetroTheme.darkGreen,
+              border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+            ),
+            child: Text(
+              'EVENT DATA NOT AVAILABLE',
+              style: TextStyle(
+                fontFamily: 'Courier',
+                color: RetroTheme.brightGreen,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          backgroundColor: Colors.transparent,
         ),
       );
       return;
     }
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.event, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Event Information',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: RetroTheme.primaryGreen,
+            border: Border.all(color: RetroTheme.brightGreen, width: 3),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: RetroTheme.darkGreen,
+              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: RetroTheme.brightGreen,
+                    border: Border(
+                      bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
+                    ),
+                  ),
+                  child: Text(
+                    '>>> EVENT DATA <<<',
+                    style: TextStyle(
+                      fontFamily: 'Courier',
+                      color: RetroTheme.darkGreen,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow('Event Name', currentEvent!.name),
-                    _buildInfoRow('Description', currentEvent!.description),
-                    _buildInfoRow('Venue', currentEvent!.venueName),
-                    _buildInfoRow('Total Boundaries', '${currentEvent!.boundaries.length}'),
-                    _buildInfoRow('Claimed Boundaries', '$claimedCount'),
-                    _buildInfoRow('Event Code', currentEvent!.eventCode),
-                    if (currentEvent!.startDate != null)
-                      _buildInfoRow('Start Date', currentEvent!.startDate.toString().substring(0, 16)),
-                    if (currentEvent!.endDate != null)
-                      _buildInfoRow('End Date', currentEvent!.endDate.toString().substring(0, 16)),
-                  ],
                 ),
-              ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildRetroInfoRow('NAME', currentEvent!.name.toUpperCase()),
+                        _buildRetroInfoRow('DESCRIPTION', currentEvent!.description.toUpperCase()),
+                        _buildRetroInfoRow('VENUE', currentEvent!.venueName.toUpperCase()),
+                        _buildRetroInfoRow('TOTAL NFTS', '${currentEvent!.boundaries.length}'),
+                        _buildRetroInfoRow('CLAIMED', '$claimedCount'),
+                        _buildRetroInfoRow('EVENT CODE', currentEvent!.eventCode.toUpperCase()),
+                        if (currentEvent!.startDate != null)
+                          _buildRetroInfoRow('START', currentEvent!.startDate.toString().substring(0, 16).toUpperCase()),
+                        if (currentEvent!.endDate != null)
+                          _buildRetroInfoRow('END', currentEvent!.endDate.toString().substring(0, 16).toUpperCase()),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '[ CLOSE ]',
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            color: RetroTheme.brightGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildRetroInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            '$label:',
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+              fontFamily: 'Courier',
+              fontSize: 10,
+              color: RetroTheme.lightGreen,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: RetroTheme.primaryGreen,
+              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Courier',
+                fontSize: 12,
+                color: RetroTheme.darkGreen,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -1596,11 +1713,8 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     );
   }
 
-
-  
   @override
   void dispose() {
-    // Remove all callbacks to prevent setState calls after dispose
     arService.onBoundaryDetected = null;
     arService.onBoundaryClaimed = null;
     arService.onProximityUpdate = null;
@@ -1609,24 +1723,19 @@ class _ARViewScreenState extends ConsumerState<ARViewScreen> with TickerProvider
     arService.onClaimedBoundariesUpdate = null;
     arService.onPositionUpdate = null;
     
-    // Cancel timers and subscriptions
     _arUpdateTimer?.cancel();
     _gyroscopeSubscription?.cancel();
     _magnetometerSubscription?.cancel();
     
-    // Dispose controllers
     confettiController.dispose();
     pulseController.dispose();
-    rotationController.dispose();
+    scanlineController.dispose();
     _cameraController?.dispose();
     
-    // Clear image caches
     _nftImageCache.clear();
     _imageCacheTimestamp.clear();
     
-    // Dispose AR service last
     arService.dispose();
     super.dispose();
   }
 }
-

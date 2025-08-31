@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:reown_appkit/reown_appkit.dart';
 import '../config/wallet_connect_config.dart';
 
@@ -19,26 +20,26 @@ class WalletConnectService {
   // Getters
   bool get isInitialized => _isInitialized;
   bool get isConnected => _appKitModal?.isConnected ?? false;
-  String? get walletAddress => _appKitModal?.session?.address;
+  String? get walletAddress => _appKitModal?.session?.peer?.metadata?.name;
   String? get chainId => _appKitModal?.selectedChain?.chainId;
   Stream<WalletConnectEvent> get events => _eventController.stream;
   ReownAppKitModal? get appKitModal => _appKitModal;
 
   // Initialize Wallet Connect service using Reown AppKit
-  Future<void> initialize() async {
+  Future<void> initialize(BuildContext context) async {
     if (_isInitialized) return;
 
     try {
       // Create featured wallets list including Core
-      final featuredWalletIds = [
+      final featuredWalletIds = <String>{
         '1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369', // Core
         'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
         'ecc4036f814562b41a5268adc86270fba1365471402006302e70169465b7ac18', // Zerion
-      ];
+      };
 
       // Initialize AppKit with configuration
       _appKitModal = ReownAppKitModal(
-        context: null, // Will be set when opening modal
+        context: context,
         projectId: WalletConnectConfig.projectId,
         metadata: const PairingMetadata(
           name: WalletConnectConfig.appName,
@@ -92,14 +93,14 @@ class WalletConnectService {
       _eventController.add(WalletConnectEvent(
         type: WalletConnectEventType.connected,
         data: {
-          'walletAddress': _appKitModal!.session?.address,
+          'walletAddress': _appKitModal!.session?.peer?.metadata?.name,
           'chainId': _appKitModal!.selectedChain?.chainId,
           'sessionTopic': _appKitModal!.session?.topic,
         },
       ));
       
       if (kDebugMode) {
-        print('Wallet connected: ${_appKitModal!.session?.address}');
+        print('Wallet connected: ${_appKitModal!.session?.peer?.metadata?.name}');
       }
     });
 
@@ -192,7 +193,7 @@ class WalletConnectService {
         chainId: 'eip155:${_appKitModal!.selectedChain!.chainId}',
         request: SessionRequestParams(
           method: 'personal_sign',
-          params: [message, _appKitModal!.session!.address],
+          params: [message, _appKitModal!.session!.peer?.metadata?.name ?? ''],
         ),
       );
       
@@ -223,7 +224,7 @@ class WalletConnectService {
 
     try {
       final transaction = {
-        'from': _appKitModal!.session!.address,
+        'from': _appKitModal!.session!.peer?.metadata?.name ?? '',
         'to': to,
         'value': value,
         if (data != null) 'data': data,
@@ -298,7 +299,7 @@ class WalletConnectService {
   // Get wallet type
   String getWalletType() {
     if (_appKitModal?.session != null) {
-      return _appKitModal?.session?.peer.metadata.name ?? 'Unknown Wallet';
+      return _appKitModal?.session?.peer?.metadata?.name ?? 'Unknown Wallet';
     }
     return 'Not Connected';
   }

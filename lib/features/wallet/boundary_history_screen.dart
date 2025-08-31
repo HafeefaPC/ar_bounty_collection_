@@ -72,13 +72,28 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'My Boundary Collection',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          'MY BOUNDARY COLLECTION',
+          style: AppTheme.retroSubtitle.copyWith(
+            fontSize: 18,
+            color: AppTheme.primaryColor,
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(
+                offset: const Offset(2, 2),
+                blurRadius: 0,
+                color: AppTheme.primaryColor.withOpacity(0.5),
+              ),
+            ],
+          ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/wallet/options'),
+                leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, color: AppTheme.primaryColor),
+            onPressed: () => context.go('/wallet/options'),
+          ),
         ),
       ),
       body: Container(
@@ -97,35 +112,55 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Header Stats
+                // Retro Header Stats
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  decoration: AppTheme.retroCardDecoration.copyWith(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.surfaceColor.withOpacity(0.8),
+                        AppTheme.surfaceColor.withOpacity(0.6),
+                      ],
+                    ),
                   ),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.celebration,
-                        size: 48,
-                        color: AppTheme.primaryColor,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                        child: Icon(
+                          Icons.celebration,
+                          size: 48,
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         '${userClaims.length}',
-                        style: TextStyle(
+                        style: AppTheme.retroTitle.copyWith(
                           fontSize: 32,
-                          fontWeight: FontWeight.bold,
                           color: AppTheme.primaryColor,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(3, 3),
+                              blurRadius: 0,
+                              color: AppTheme.primaryColor.withOpacity(0.6),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        'Boundaries Collected',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withValues(alpha: 0.8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                        child: Text(
+                          'BOUNDARIES COLLECTED',
+                          style: AppTheme.retroButton.copyWith(
+                            fontSize: 14,
+                            color: AppTheme.secondaryColor,
+                            letterSpacing: 1.0,
+                          ),
                         ),
                       ),
                     ],
@@ -211,7 +246,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                                       ),
                                       const SizedBox(height: 16),
                                       ElevatedButton(
-                                        onPressed: () => context.go('/event-join'),
+                                        onPressed: () => context.go('/event/join'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppTheme.primaryColor,
                                         ),
@@ -250,20 +285,22 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      decoration: AppTheme.retroCardDecoration.copyWith(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.surfaceColor.withOpacity(0.8),
+            AppTheme.surfaceColor.withOpacity(0.6),
+          ],
+        ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: Container(
           width: 50,
           height: 50,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(25),
-          ),
+          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
           child: Icon(
             Icons.check_circle,
             color: AppTheme.primaryColor,

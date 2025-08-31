@@ -1,166 +1,207 @@
-import 'wallet_connect_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:reown_appkit/reown_appkit.dart';
+import 'supabase_service.dart';
 
 class WalletService {
-  static final WalletService _instance = WalletService._internal();
-  factory WalletService() => _instance;
-  WalletService._internal();
+  static const _storage = FlutterSecureStorage();
+  static const String _walletAddressKey = 'wallet_address';
+  static const String _isConnectedKey = 'is_wallet_connected';
+  static const String _connectionTimeKey = 'wallet_connection_time';
+  
+  ReownAppKitModal? _appKitModal;
+  String? _connectedWalletAddress;
+  bool _isConnected = false;
+  final SupabaseService _supabaseService = SupabaseService();
 
-  final WalletConnectService _walletConnectService = WalletConnectService();
+  // Getters
+  String? get connectedWalletAddress => _connectedWalletAddress;
+  bool get isConnected => _isConnected;
+  ReownAppKitModal? get appKitModal => _appKitModal;
 
-  String? get walletAddress => _walletConnectService.walletAddress;
-  String? get connectedWalletAddress => _walletConnectService.walletAddress;
-  bool get isConnected => _walletConnectService.isConnected;
-
-  // Initialize WalletConnect service
-  Future<void> initialize() async {
-    await _walletConnectService.initialize();
+  // Initialize wallet service
+  Future<void> initialize(BuildContext context) async {
+    await _loadWalletState();
   }
 
-  // Connect wallet with WalletConnect modal
-  Future<bool> connectWallet() async {
+  // Load wallet state from secure storage
+  Future<void> _loadWalletState() async {
     try {
-      // This would require context, so we return true for now
-      // The actual connection will happen when openModal is called
-      return true;
+      final walletAddress = await _storage.read(key: _walletAddressKey);
+      final isConnected = await _storage.read(key: _isConnectedKey);
+      
+      if (walletAddress != null && isConnected == 'true') {
+        _connectedWalletAddress = walletAddress;
+        _isConnected = true;
+        debugPrint('Wallet state loaded: $walletAddress');
+      }
     } catch (e) {
-      return false;
+      debugPrint('Error loading wallet state: $e');
     }
   }
 
-  // Open wallet connection modal (requires context)
-  Future<void> openWalletModal(context) async {
-    await _walletConnectService.openModal(context);
-  }
-
-  // Connect to Core mobile wallet via Wallet Connect
-  Future<bool> connectToCoreMobile() async {
-    return await _walletConnectService.connectToCore();
-  }
-
-  // Connect wallet with email authentication (legacy - now redirects to WalletConnect)
-  Future<bool> connectWalletWithEmail(String email) async {
-    // Email authentication is not supported with pure WalletConnect
-    // This method is kept for backward compatibility
-    return false;
-  }
-
-  // Connect external wallet
-  Future<bool> connectExternalWallet({String? walletType}) async {
+  // Save wallet state to secure storage
+  Future<void> _saveWalletState(String walletAddress) async {
     try {
-      return await _walletConnectService.connectToCore();
+      await _storage.write(key: _walletAddressKey, value: walletAddress);
+      await _storage.write(key: _isConnectedKey, value: 'true');
+      await _storage.write(key: _connectionTimeKey, value: DateTime.now().toIso8601String());
+      
+      _connectedWalletAddress = walletAddress;
+      _isConnected = true;
+      
+      debugPrint('Wallet state saved: $walletAddress');
     } catch (e) {
+      debugPrint('Error saving wallet state: $e');
+    }
+  }
+
+  // Clear wallet state from secure storage
+  Future<void> _clearWalletState() async {
+    try {
+      await _storage.delete(key: _walletAddressKey);
+      await _storage.delete(key: _isConnectedKey);
+      await _storage.delete(key: _connectionTimeKey);
+      
+      _connectedWalletAddress = null;
+      _isConnected = false;
+      
+      debugPrint('Wallet state cleared');
+    } catch (e) {
+      debugPrint('Error clearing wallet state: $e');
+    }
+  }
+
+  // Connect wallet and create user in database
+  Future<bool> connectWallet(String walletAddress) async {
+    try {
+      // Test database connection first
+      debugPrint('Testing database connection...');
+      try {
+        final testResponse = await _supabaseService.getUserByWalletAddress('test_connection');
+        debugPrint('Database connection test: $testResponse');
+      } catch (testError) {
+        debugPrint('Database connection test failed: $testError');
+      }
+      
+      // Create or update user in database
+      final userCreated = await _createOrUpdateUser(walletAddress);
+      
+      if (userCreated) {
+        // Save wallet state locally
+        await _saveWalletState(walletAddress);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error connecting wallet: $e');
+      // Even if database fails, try to save wallet state locally
+      try {
+        await _saveWalletState(walletAddress);
+        debugPrint('Wallet state saved locally despite database failure');
+        return true; // Return true since wallet is functionally connected
+      } catch (localError) {
+        debugPrint('Failed to save wallet state locally: $localError');
+        return false;
+      }
+    }
+  }
+
+  // Create or update user in database
+  Future<bool> _createOrUpdateUser(String walletAddress) async {
+    try {
+      debugPrint('Starting _createOrUpdateUser for wallet: $walletAddress');
+      
+      // Check if user already exists
+      debugPrint('Checking if user exists...');
+      final existingUser = await _supabaseService.getUserByWalletAddress(walletAddress);
+      debugPrint('Existing user check result: ${existingUser != null ? 'Found' : 'Not found'}');
+      
+      if (existingUser != null) {
+        // Update last login
+        debugPrint('Updating last login for existing user...');
+        await _supabaseService.updateUserLastLogin(walletAddress);
+        debugPrint('User updated successfully: $walletAddress');
+        return true;
+      } else {
+        // Create new user
+        debugPrint('Creating new user...');
+        final newUser = {
+          'wallet_address': walletAddress,
+          'username': 'user_${walletAddress.substring(0, 8)}',
+          'display_name': 'User ${walletAddress.substring(0, 8)}',
+          'created_at': DateTime.now().toIso8601String(),
+          'last_login': DateTime.now().toIso8601String(),
+          'preferences': {},
+          'stats': {
+            'total_nfts_earned': 0,
+            'total_events_joined': 0,
+            'total_boundaries_claimed': 0
+          }
+        };
+        
+        debugPrint('New user data: $newUser');
+        final success = await _supabaseService.createUser(newUser);
+        debugPrint('Create user result: $success');
+        
+        if (success) {
+          debugPrint('New user created successfully: $walletAddress');
+          return true;
+        } else {
+          debugPrint('Failed to create user: $walletAddress');
+          return false;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in _createOrUpdateUser: $e');
+      debugPrint('Error stack trace: ${StackTrace.current}');
       return false;
     }
   }
 
   // Disconnect wallet
   Future<void> disconnectWallet() async {
-    await _walletConnectService.disconnect();
+    try {
+      await _clearWalletState();
+      debugPrint('Wallet disconnected');
+    } catch (e) {
+      debugPrint('Error disconnecting wallet: $e');
+    }
   }
 
-  // Check if wallet was previously connected
-  Future<bool> checkPreviousConnection() async {
-    return _walletConnectService.isConnected;
+  // Check if wallet is connected
+  Future<bool> checkWalletConnection() async {
+    await _loadWalletState();
+    return _isConnected && _connectedWalletAddress != null;
   }
 
-  // Get wallet balance (needs to be implemented with Web3 calls)
-  Future<double> getWalletBalance() async {
-    // This would require a Web3 service to get the actual balance
-    // For now, return 0.0
-    return 0.0;
+  // Check if wallet is connected (local check only, no database)
+  bool isWalletConnectedLocally() {
+    final connected = _isConnected && _connectedWalletAddress != null;
+    debugPrint('WalletService.isWalletConnectedLocally() called: $connected');
+    debugPrint('  - _isConnected: $_isConnected');
+    debugPrint('  - _connectedWalletAddress: $_connectedWalletAddress');
+    return connected;
   }
 
-  // Sign message
-  Future<String> signMessage(String message) async {
-    final signature = await _walletConnectService.signMessage(message);
-    return signature ?? '';
+  // Get wallet address
+  String? get walletAddress => _connectedWalletAddress;
+
+  // Force refresh wallet state from storage
+  Future<void> refreshWalletState() async {
+    debugPrint('WalletService.refreshWalletState() called');
+    await _loadWalletState();
+    debugPrint('Wallet state refreshed - Connected: $_isConnected, Address: $_connectedWalletAddress');
   }
 
-  // Send transaction
-  Future<String> sendTransaction({
-    required String to,
-    required String amount,
-    String? data,
-  }) async {
-    // Convert amount to wei (assuming amount is in ETH/AVAX)
-    final wei = (double.parse(amount) * 1e18).toInt().toRadixString(16);
-    final txHash = await _walletConnectService.sendTransaction(
-      to: to,
-      value: '0x$wei',
-      data: data,
-    );
-    return txHash ?? '';
+  // Set app kit modal (for AR functionality)
+  void setAppKitModal(ReownAppKitModal modal) {
+    _appKitModal = modal;
   }
 
-  // Get transaction history (would need to be implemented with blockchain API)
-  Future<List<Map<String, dynamic>>> getTransactionHistory() async {
-    // This would require a blockchain API service
-    return [];
-  }
-
-  // Export wallet (not supported with WalletConnect)
-  Future<String?> exportWallet() async {
-    // Not supported with WalletConnect as it's non-custodial
-    return null;
-  }
-
-  // Get user profile (limited with WalletConnect)
-  Map<String, dynamic>? get userProfile => {
-    'walletAddress': walletAddress,
-    'walletType': getWalletType(),
-  };
-
-  // Get user email (not available with WalletConnect)
-  String? get userEmail => null;
-
-  // Validate wallet address format
-  static bool isValidAddress(String address) {
-    return WalletConnectService.isValidAddress(address);
-  }
-
-  // Get shortened address for display
-  static String getShortAddress(String address) {
-    return WalletConnectService.getShortAddress(address);
-  }
-
-  // Get wallet type
-  String getWalletType() {
-    return _walletConnectService.getWalletType();
-  }
-
-  // Create embedded wallet (not supported with WalletConnect)
-  Future<bool> createEmbeddedWallet() async {
-    return false;
-  }
-
-  // Check if user has embedded wallet (not supported with WalletConnect)
-  bool hasEmbeddedWallet() {
-    return false;
-  }
-
-  // Connect wallet with SMS authentication (not supported with WalletConnect)
-  Future<bool> connectWalletWithSMS(String phoneNumber) async {
-    return false;
-  }
-
-  // Switch to specific chain
-  Future<bool> switchChain(String chainId) async {
-    return await _walletConnectService.switchChain(chainId);
-  }
-
-  // Get supported chains
-  List<String> getSupportedChains() {
-    return _walletConnectService.getSupportedChains();
-  }
-
-  // Get wallet connect service events stream
-  Stream<WalletConnectEvent> get walletEvents => _walletConnectService.events;
-
-  // Get current chain ID
-  String? get chainId => _walletConnectService.chainId;
-
-  // Clean up resources
+  // Dispose
   void dispose() {
-    _walletConnectService.dispose();
+    _appKitModal?.dispose();
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/services/wallet_service.dart';
+import '../../../shared/providers/reown_provider.dart';
 
 class WalletOptionsScreen extends ConsumerStatefulWidget {
   const WalletOptionsScreen({super.key});
@@ -12,56 +13,139 @@ class WalletOptionsScreen extends ConsumerStatefulWidget {
   ConsumerState<WalletOptionsScreen> createState() => _WalletOptionsScreenState();
 }
 
-class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
+class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with WidgetsBindingObserver {
   bool _isConnected = false;
   String? _walletAddress;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Delay the check to ensure wallet service is properly initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkWalletStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Refresh wallet status when app comes back to foreground
+      _checkWalletStatus();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh wallet status when dependencies change (e.g., navigation back)
     _checkWalletStatus();
   }
 
-  void _checkWalletStatus() {
-    final walletService = WalletService();
-    setState(() {
-      _isConnected = walletService.isConnected;
-      _walletAddress = walletService.walletAddress;
-    });
+  void _checkWalletStatus() async {
+    try {
+      // Get wallet connection state from the provider
+      final walletState = ref.read(walletConnectionProvider);
+      
+      debugPrint('Wallet status check - Connected: ${walletState.isConnected}, Address: ${walletState.walletAddress}');
+      
+      if (mounted) {
+        setState(() {
+          _isConnected = walletState.isConnected;
+          _walletAddress = walletState.walletAddress;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking wallet status: $e');
+      // Set default state on error
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _walletAddress = null;
+        });
+      }
+    }
+  }
+
+
+
+  // Public method to refresh wallet status
+  void refreshWalletStatus() {
+    _checkWalletStatus();
   }
 
   void _disconnectWallet() async {
-    final walletService = WalletService();
-    await walletService.disconnectWallet();
-    setState(() {
-      _isConnected = false;
-      _walletAddress = null;
-    });
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Wallet disconnected'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+    try {
+      // Disconnect using the provider
+      await ref.read(walletConnectionProvider.notifier).disconnect();
+      
+      setState(() {
+        _isConnected = false;
+        _walletAddress = null;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet disconnected'),
+            backgroundColor: AppTheme.successColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error disconnecting wallet: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error disconnecting wallet: $e'),
+            backgroundColor: AppTheme.errorColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Listen to wallet connection provider changes
+    ref.listen<WalletConnectionState>(walletConnectionProvider, (previous, next) {
+      if (mounted) {
+        setState(() {
+          _isConnected = next.isConnected;
+          _walletAddress = next.walletAddress;
+        });
+      }
+    });
+
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     
+
+    
+
+    
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              _checkWalletStatus();
+            },
+            color: AppTheme.primaryColor,
+            backgroundColor: AppTheme.surfaceColor,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
               constraints: BoxConstraints(
                 minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
               ),
@@ -73,23 +157,23 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Header with animation
-                      _buildAnimatedHeader(screenWidth, screenHeight),
+                      // Retro Header with animation
+                      _buildRetroAnimatedHeader(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.05),
                       
-                      // Wallet Status Card with animation
-                      _buildAnimatedWalletCard(screenWidth, screenHeight),
+                      // Retro Wallet Status Card with animation
+                      _buildRetroAnimatedWalletCard(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.05),
                       
-                      // Options with staggered animations
-                      _buildAnimatedOptions(screenWidth, screenHeight),
+                      // Retro Options with staggered animations
+                      _buildRetroAnimatedOptions(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.04),
                       
-                      // Wallet Actions with animation
-                      _buildAnimatedWalletActions(screenWidth, screenHeight),
+                      // Retro Wallet Actions with animation
+                      _buildRetroAnimatedWalletActions(screenWidth, screenHeight),
                       
                       // Bottom Spacer
                       SizedBox(height: screenHeight * 0.03),
@@ -101,18 +185,29 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
           ),
         ),
       ),
+      )
     );
   }
 
-  Widget _buildAnimatedHeader(double screenWidth, double screenHeight) {
+  Widget _buildRetroAnimatedHeader(double screenWidth, double screenHeight) {
     return Row(
       children: [
-                  IconButton(
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(0), // Pixelated
+            border: Border.all(
+              color: AppTheme.textColor.withOpacity(0.2),
+              width: 2,
+            ),
+          ),
+          child: IconButton(
             onPressed: () => context.go('/wallet/connect'),
-            icon: Icon(Icons.arrow_back, color: Colors.white, size: screenWidth * 0.06),
+            icon: Icon(Icons.arrow_back, color: AppTheme.textColor, size: screenWidth * 0.06),
             style: IconButton.styleFrom(
-            backgroundColor: Colors.white.withValues(alpha: 0.2),
-            padding: EdgeInsets.all(screenWidth * 0.03),
+              backgroundColor: AppTheme.surfaceColor,
+              padding: EdgeInsets.all(screenWidth * 0.03),
+            ),
           ),
         ).animate().fadeIn(
           duration: 600.ms,
@@ -121,11 +216,10 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
         SizedBox(width: screenWidth * 0.04),
         Expanded(
           child: Text(
-            'Welcome to FaceReflector',
-            style: TextStyle(
+            'WELCOME TO FACEREFLECTOR',
+            style: AppTheme.retroTitle.copyWith(
               fontSize: screenWidth * 0.065,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppTheme.textColor,
             ),
           ).animate().fadeIn(
             duration: 800.ms,
@@ -136,21 +230,21 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
     );
   }
 
-  Widget _buildAnimatedWalletCard(double screenWidth, double screenHeight) {
+  Widget _buildRetroAnimatedWalletCard(double screenWidth, double screenHeight) {
     return Container(
       padding: EdgeInsets.all(screenWidth * 0.05),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(0), // Pixelated
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-          width: 1.5,
+          color: AppTheme.primaryColor,
+          width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: AppTheme.primaryColor.withOpacity(0.4),
+            offset: const Offset(4, 4),
+            blurRadius: 0,
           ),
         ],
       ),
@@ -159,18 +253,17 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
           Icon(
             _isConnected ? Icons.account_balance_wallet : Icons.account_balance_wallet_outlined,
             size: screenWidth * 0.12,
-            color: _isConnected ? Colors.green[300] : Colors.white.withValues(alpha: 0.8),
+            color: _isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.8),
           ).animate().fadeIn(
             duration: 600.ms,
             delay: 400.ms,
           ),
           SizedBox(height: screenHeight * 0.02),
           Text(
-            _isConnected ? 'Wallet Connected' : 'No Wallet Connected',
-            style: TextStyle(
+            _isConnected ? 'WALLET CONNECTED' : 'NO WALLET CONNECTED',
+            style: AppTheme.retroSubtitle.copyWith(
               fontSize: screenWidth * 0.05,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppTheme.textColor,
             ),
             textAlign: TextAlign.center,
           ).animate().fadeIn(
@@ -182,18 +275,19 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
             Container(
               padding: EdgeInsets.all(screenWidth * 0.03),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(0), // Pixelated
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppTheme.textColor.withOpacity(0.2),
+                  width: 1,
                 ),
               ),
               child: Text(
                 _walletAddress!,
-                style: TextStyle(
+                style: AppTheme.retroBody.copyWith(
                   fontSize: screenWidth * 0.035,
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontFamily: 'monospace',
+                  color: AppTheme.textColor.withOpacity(0.9),
+                  fontFamily: 'Courier',
                 ),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
@@ -211,13 +305,13 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
     );
   }
 
-  Widget _buildAnimatedOptions(double screenWidth, double screenHeight) {
+  Widget _buildRetroAnimatedOptions(double screenWidth, double screenHeight) {
     return Column(
       children: [
         // Join Event Option
-        _buildAnimatedOptionCard(
+        _buildRetroAnimatedOptionCard(
           icon: Icons.qr_code,
-          title: 'Join Event',
+          title: 'JOIN EVENT',
           subtitle: 'Enter event code to participate',
           onTap: () => context.go('/event/join'),
           screenWidth: screenWidth,
@@ -228,9 +322,9 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
         SizedBox(height: screenHeight * 0.025),
         
         // Create Event Option
-        _buildAnimatedOptionCard(
+        _buildRetroAnimatedOptionCard(
           icon: Icons.add_location,
-          title: 'Create Event',
+          title: 'CREATE EVENT',
           subtitle: 'Set up a new AR airdrop event',
           onTap: () => context.go('/event/create'),
           screenWidth: screenWidth,
@@ -241,9 +335,9 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
         SizedBox(height: screenHeight * 0.025),
         
         // Boundary History Option
-        _buildAnimatedOptionCard(
+        _buildRetroAnimatedOptionCard(
           icon: Icons.history,
-          title: 'My Boundary Collection',
+          title: 'MY BOUNDARY COLLECTION',
           subtitle: 'View all your claimed boundaries from different events',
           onTap: () => context.go('/boundary-history'),
           screenWidth: screenWidth,
@@ -254,7 +348,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
     );
   }
 
-  Widget _buildAnimatedOptionCard({
+  Widget _buildRetroAnimatedOptionCard({
     required IconData icon,
     required String title,
     required String subtitle,
@@ -268,13 +362,17 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
       child: Container(
         padding: EdgeInsets.all(screenWidth * 0.05),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          color: AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(0), // Pixelated
+          border: Border.all(
+            color: AppTheme.secondaryColor,
+            width: 2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 6),
+              color: AppTheme.secondaryColor.withOpacity(0.4),
+              offset: const Offset(3, 3),
+              blurRadius: 0,
             ),
           ],
         ),
@@ -284,19 +382,19 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
               width: screenWidth * 0.12,
               height: screenWidth * 0.12,
               decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(14),
+                gradient: AppTheme.retroGradient,
+                borderRadius: BorderRadius.circular(0), // Pixelated
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: AppTheme.primaryColor.withOpacity(0.4),
+                    offset: const Offset(3, 3),
+                    blurRadius: 0,
                   ),
                 ],
               ),
               child: Icon(
                 icon,
-                color: Colors.white,
+                color: AppTheme.backgroundColor,
                 size: screenWidth * 0.06,
               ),
             ),
@@ -307,18 +405,17 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: AppTheme.retroSubtitle.copyWith(
                       fontSize: screenWidth * 0.045,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[800],
+                      color: AppTheme.textColor,
                     ),
                   ),
                   SizedBox(height: screenHeight * 0.005),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: AppTheme.retroBody.copyWith(
                       fontSize: screenWidth * 0.035,
-                      color: Colors.grey[600],
+                      color: AppTheme.textColor.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -326,7 +423,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: Colors.grey[400],
+              color: AppTheme.textColor.withOpacity(0.5),
               size: screenWidth * 0.04,
             ),
           ],
@@ -338,30 +435,29 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
     );
   }
 
-  Widget _buildAnimatedWalletActions(double screenWidth, double screenHeight) {
+  Widget _buildRetroAnimatedWalletActions(double screenWidth, double screenHeight) {
     if (_isConnected) {
       return SizedBox(
         width: double.infinity,
         height: screenHeight * 0.06,
         child: OutlinedButton(
           onPressed: _disconnectWallet,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
+          style: AppTheme.retroOutlinedButton.copyWith(
+            side: MaterialStateProperty.all(BorderSide(
+              color: AppTheme.textColor.withOpacity(0.4),
+              width: 2,
+            )),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.logout, size: screenWidth * 0.05),
+              Icon(Icons.logout, size: screenWidth * 0.05, color: AppTheme.textColor),
               SizedBox(width: screenWidth * 0.02),
               Text(
-                'Disconnect Wallet',
-                style: TextStyle(
+                'DISCONNECT WALLET',
+                style: AppTheme.retroButton.copyWith(
                   fontSize: screenWidth * 0.04,
-                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textColor,
                 ),
               ),
             ],
@@ -376,26 +472,28 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> {
         width: double.infinity,
         height: screenHeight * 0.06,
         child: ElevatedButton(
-          onPressed: () => context.go('/wallet/connect'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppTheme.primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            elevation: 8,
-            shadowColor: Colors.black.withValues(alpha: 0.2),
+          onPressed: () async {
+            // Initialize wallet service before navigating
+            final walletService = WalletService();
+            await walletService.initialize(context);
+            if (mounted) {
+              context.go('/wallet/connect');
+            }
+          },
+          style: AppTheme.retroPrimaryButton.copyWith(
+            backgroundColor: MaterialStateProperty.all(AppTheme.textColor),
+            foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.link, size: screenWidth * 0.05),
+              Icon(Icons.link, size: screenWidth * 0.05, color: AppTheme.backgroundColor),
               SizedBox(width: screenWidth * 0.02),
               Text(
-                'Connect Wallet',
-                style: TextStyle(
+                'CONNECT WALLET',
+                style: AppTheme.retroButton.copyWith(
                   fontSize: screenWidth * 0.04,
-                  fontWeight: FontWeight.w600,
+                  color: AppTheme.backgroundColor,
                 ),
               ),
             ],

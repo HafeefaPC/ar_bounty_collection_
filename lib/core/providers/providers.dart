@@ -138,5 +138,5 @@ void initializeProviders() {
   final walletService = WalletService();
   
   // Initialize Wallet Service
-  walletService.checkPreviousConnection();
+  walletService.checkWalletConnection();
 }

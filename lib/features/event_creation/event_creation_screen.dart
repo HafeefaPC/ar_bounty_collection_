@@ -13,6 +13,8 @@ import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
+import '../../../shared/services/smart_contract_service.dart';
+import '../../../shared/providers/reown_provider.dart';
 import 'package:geocoding/geocoding.dart';
 
 class EventCreationScreen extends ConsumerStatefulWidget {
@@ -71,6 +73,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _initializeWalletService();
+  }
+
+  Future<void> _initializeWalletService() async {
+    // No need to initialize wallet service here anymore
+    // It's handled by the AppProviderWrapper
+    debugPrint('Wallet service initialization skipped - handled by provider wrapper');
   }
 
   @override
@@ -83,7 +92,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     super.dispose();
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _addNFTAtCurrentLocation() async {
     try {
       // Check location permissions first
       LocationPermission permission = await Geolocator.checkPermission();
@@ -91,11 +100,11 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permission is required to get your current location'),
-                backgroundColor: Colors.orange,
-              ),
+            _showLocationPermissionDialog(
+              'Location Permission Required',
+              'This app needs location access to add NFT locations. Please grant location permission.',
+              'Grant Permission',
+              () => _addNFTAtCurrentLocation(),
             );
           }
           return;
@@ -104,11 +113,11 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location permissions are permanently denied. Please enable them in settings.'),
-              backgroundColor: Colors.red,
-            ),
+          _showLocationPermissionDialog(
+            'Location Permission Denied',
+            'Location permissions are permanently denied. Please enable them in your device settings to use this feature.',
+            'Open Settings',
+            () => _openAppSettings(),
           );
         }
         return;
@@ -118,11 +127,11 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location services are disabled. Please enable GPS.'),
-              backgroundColor: Colors.orange,
-            ),
+          _showLocationPermissionDialog(
+            'Location Services Disabled',
+            'GPS/Location services are disabled on your device. Please enable them to use this feature.',
+            'Enable GPS',
+            () => _openLocationSettings(),
           );
         }
         return;
@@ -130,20 +139,324 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
+      final currentLocation = LatLng(position.latitude, position.longitude);
+      final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
+      
+      if (_boundaryLocations.length < nftSupplyCount) {
+        setState(() {
+          _boundaryLocations.add(currentLocation);
+          _markers.add(
+            Marker(
+              markerId: MarkerId('boundary_${_boundaryLocations.length}'),
+              position: currentLocation,
+              infoWindow: InfoWindow(
+                title: 'Boundary ${_boundaryLocations.length}',
+                snippet: 'NFT Location (Current Location)',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            ),
+          );
+        });
+        
+        // Center map on the new location
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(currentLocation, 18.0),
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: AppTheme.backgroundColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'NFT location added at current position!',
+                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.successColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppTheme.backgroundColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'All NFT locations have been placed!',
+                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showRetroError('Error getting current location: $e');
+      }
+    }
+  }
+
+  void _clearAllBoundaries() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.backgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+        title: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.retroPixelBorder(AppTheme.errorColor),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.warning,
+                color: AppTheme.errorColor,
+                size: 12,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'CLEAR ALL BOUNDARIES',
+                style: AppTheme.retroSubtitle.copyWith(
+                  color: AppTheme.errorColor,
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to remove all ${_boundaryLocations.length} placed NFT locations? This action cannot be undone.',
+          style: AppTheme.retroBody.copyWith(
+            color: AppTheme.textColor,
+            fontSize: 12,
+          ),
+        ),
+        actions: [
+          Container(
+            decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+            child: TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'CANCEL',
+                style: AppTheme.retroButton.copyWith(
+                  color: AppTheme.textColor.withOpacity(0.8),
+                  fontSize: 12,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            decoration: AppTheme.retroPixelBorder(AppTheme.errorColor),
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _boundaryLocations.clear();
+                  _markers.removeWhere((marker) => 
+                    marker.markerId.value.startsWith('boundary_')
+                  );
+                });
+
+                Navigator.of(context).pop();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: AppTheme.primaryColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'All boundaries cleared! You can now place new locations.',
+                            style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: AppTheme.successColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              ),
+              child: Text(
+                'CLEAR ALL',
+                style: AppTheme.retroButton.copyWith(
+                  color: AppTheme.errorColor,
+                  fontSize: 12,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      // Check location permissions first
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            _showLocationPermissionDialog(
+              'Location Permission Required',
+              'This app needs location access to help you create events at specific locations. Please grant location permission.',
+              'Grant Permission',
+              () => _getCurrentLocation(),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          _showLocationPermissionDialog(
+            'Location Permission Denied',
+            'Location permissions are permanently denied. Please enable them in your device settings to use this feature.',
+            'Open Settings',
+            () => _openAppSettings(),
+          );
+        }
+        return;
+      }
+
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          _showLocationPermissionDialog(
+            'Location Services Disabled',
+            'GPS/Location services are disabled on your device. Please enable them to use this feature.',
+            'Enable GPS',
+            () => _openLocationSettings(),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
       setState(() {
         _center = LatLng(position.latitude, position.longitude);
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_center, _zoom));
-    } catch (e) {
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error getting location: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Location updated: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+            backgroundColor: AppTheme.successColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
           ),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        _showLocationPermissionDialog(
+          'Location Error',
+          'Failed to get your current location. Please check your GPS settings and try again.',
+          'Retry',
+          () => _getCurrentLocation(),
+        );
+      }
+    }
+  }
+
+  void _showLocationPermissionDialog(String title, String message, String actionText, VoidCallback onAction) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.backgroundColor,
+        title: Text(
+          title,
+          style: AppTheme.retroSubtitle.copyWith(color: AppTheme.primaryColor),
+        ),
+        content: Text(
+          message,
+          style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: AppTheme.retroButton.copyWith(color: AppTheme.secondaryColor),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              onAction();
+            },
+            style: AppTheme.retroPrimaryButton,
+            child: Text(actionText),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAppSettings() async {
+    try {
+      await Geolocator.openAppSettings();
+    } catch (e) {
+      debugPrint('Error opening app settings: $e');
+    }
+  }
+
+  Future<void> _openLocationSettings() async {
+    try {
+      await Geolocator.openLocationSettings();
+    } catch (e) {
+      debugPrint('Error opening location settings: $e');
     }
   }
 
@@ -369,66 +682,70 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   Widget _buildEventDetailsStep() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      child: Form(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 40), // Add bottom padding
+        child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Event Details',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+              child: Text(
+                'EVENT DETAILS',
+                style: AppTheme.retroTitle.copyWith(
+                  fontSize: 24,
+                  color: AppTheme.primaryColor,
+                  letterSpacing: 2.0,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 20),
             
-            // Event Title
+            // Retro Event Title
             TextFormField(
               controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'Event Title *',
-                labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.1),
+              decoration: AppTheme.retroInputDecoration(
+                labelText: 'EVENT TITLE *',
+                hintText: 'Enter your event title',
               ),
-              style: const TextStyle(color: Colors.white),
+              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter event title';
                 }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Event Description
-            TextFormField(
-              controller: _descriptionController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Event Description *',
-                labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.1),
-              ),
-              style: const TextStyle(color: Colors.white),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter event description';
+                if (value.length < 3) {
+                  return 'Title must be at least 3 characters';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
             
-            // Start Date and Time
+            // Retro Event Description
+            TextFormField(
+              controller: _descriptionController,
+              maxLines: 3,
+              decoration: AppTheme.retroInputDecoration(
+                labelText: 'EVENT DESCRIPTION *',
+                hintText: 'Describe your event',
+              ),
+              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter event description';
+                }
+                if (value.length < 10) {
+                  return 'Description must be at least 10 characters';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            
+            // Retro Start Date and Time
             Row(
               children: [
                 Expanded(
@@ -436,24 +753,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectDate(context, true),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white30),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
+                      decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Start Date',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          Text(
+                            'START DATE',
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.secondaryColor,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _startDate != null
                                 ? DateFormat('MMM dd, yyyy').format(_startDate!)
-                                : 'Select Date',
-                            style: const TextStyle(color: Colors.white, fontSize: 16),
+                                : 'SELECT DATE',
+                            style: AppTheme.retroBody.copyWith(
+                              color: AppTheme.textColor,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -466,24 +785,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectTime(context, true),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white30),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
+                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Start Time',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          Text(
+                            'START TIME',
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.accentColor,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _startTime != null
                                 ? _startTime!.format(context)
-                                : 'Select Time',
-                            style: const TextStyle(color: Colors.white, fontSize: 16),
+                                : 'SELECT TIME',
+                            style: AppTheme.retroBody.copyWith(
+                              color: AppTheme.textColor,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -494,7 +815,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             ),
             const SizedBox(height: 16),
             
-            // End Date and Time
+            // Retro End Date and Time
             Row(
               children: [
                 Expanded(
@@ -502,24 +823,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectDate(context, false),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white30),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
+                      decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'End Date',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          Text(
+                            'END DATE',
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.secondaryColor,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _endDate != null
                                 ? DateFormat('MMM dd, yyyy').format(_endDate!)
-                                : 'Select Date',
-                            style: const TextStyle(color: Colors.white, fontSize: 16),
+                                : 'SELECT DATE',
+                            style: AppTheme.retroBody.copyWith(
+                              color: AppTheme.textColor,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -532,24 +855,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectTime(context, false),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white30),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white.withValues(alpha: 0.1),
-                      ),
+                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'End Time',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          Text(
+                            'END TIME',
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.accentColor,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _endTime != null
                                 ? _endTime!.format(context)
-                                : 'Select Time',
-                            style: const TextStyle(color: Colors.white, fontSize: 16),
+                                : 'SELECT TIME',
+                            style: AppTheme.retroBody.copyWith(
+                              color: AppTheme.textColor,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -560,44 +885,39 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             ),
             const SizedBox(height: 16),
             
-            // Venue
+            // Retro Venue
             TextFormField(
               controller: _venueController,
-              decoration: InputDecoration(
-                labelText: 'Venue/Location *',
-                labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.1),
+              decoration: AppTheme.retroInputDecoration(
+                labelText: 'VENUE/LOCATION *',
+                hintText: 'Enter event venue',
               ),
-              style: const TextStyle(color: Colors.white),
+              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter venue';
+                }
+                if (value.length < 3) {
+                  return 'Venue must be at least 3 characters';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
             
-            // NFT Supply Count
+            // Retro NFT Supply Count
             TextFormField(
               controller: _nftSupplyController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: 'NFT Supply Count *',
-                labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.1),
+              decoration: AppTheme.retroInputDecoration(
+                labelText: 'NFT SUPPLY COUNT *',
+                hintText: 'Enter number of NFTs',
+              ).copyWith(
                 suffixText: 'NFTs',
+                suffixStyle: TextStyle(color: AppTheme.primaryColor),
               ),
-              style: const TextStyle(color: Colors.white),
+              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter NFT supply count';
@@ -606,25 +926,24 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 if (count == null || count <= 0) {
                   return 'Please enter a valid number';
                 }
+                if (count > 1000) {
+                  return 'NFT count cannot exceed 1000';
+                }
                 return null;
               },
             ),
             const SizedBox(height: 16),
             
-            // NFT Image
+            // Retro NFT Image
             InkWell(
               onTap: _pickNFTImage,
               child: Container(
                 width: double.infinity,
                 height: 120,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white30, style: BorderStyle.solid),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
+                decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
                 child: _nftImagePath != null
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(0), // Pixelated
                         child: Image.file(
                           File(_nftImagePath!),
                           fit: BoxFit.cover,
@@ -632,16 +951,19 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           Icon(
                             Icons.add_photo_alternate,
-                            color: Colors.white70,
+                            color: AppTheme.primaryColor,
                             size: 40,
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            'Add NFT Image (Required)',
-                            style: TextStyle(color: Colors.white70),
+                            'ADD NFT IMAGE (REQUIRED)',
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.primaryColor,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -649,267 +971,646 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
   Widget _buildAreaSelectionStep() {
-    return Column(
-      children: [
-        // Search Bar
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search location...',
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.1),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 40), // Add bottom padding
+        child: Column(
+        children: [
+          // Retro Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.map,
+                  color: AppTheme.primaryColor,
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'SELECT EVENT AREA',
+                  style: AppTheme.retroTitle.copyWith(
+                    fontSize: 20,
+                    color: AppTheme.primaryColor,
+                    letterSpacing: 2.0,
                   ),
-                  style: const TextStyle(color: Colors.white),
-                  onSubmitted: (_) => _searchLocation(),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _getCurrentLocation,
-                icon: const Icon(Icons.my_location, color: Colors.white),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
+                const SizedBox(height: 4),
+                Text(
+                  'Tap on the map to set the center of your event area',
+                  style: AppTheme.retroBody.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-            ],
-          ),
-        ),
-        
-        // Map
-        Expanded(
-          child: GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(
-              target: _center,
-              zoom: _zoom,
+              ],
             ),
-            onTap: _onMapTap,
-            markers: _markers,
-            circles: _circles,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
           ),
-        ),
-        
-        // Area Radius Slider
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                'Event Area Radius: ${_selectedAreaRadius.round()}m',
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              Slider(
-                value: _selectedAreaRadius,
-                min: 50.0,
-                max: 500.0,
-                divisions: 45,
-                activeColor: AppTheme.primaryColor,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedAreaRadius = value;
-                    if (_selectedAreaCenter != null) {
-                      _circles.clear();
-                      _circles.add(
-                        Circle(
-                          circleId: const CircleId('event_area'),
-                          center: _selectedAreaCenter!,
-                          radius: _selectedAreaRadius,
-                          fillColor: AppTheme.primaryColor.withValues(alpha: 0.3),
-                          strokeColor: AppTheme.primaryColor,
-                          strokeWidth: 2,
-                        ),
-                      );
-                    }
-                  });
-                },
-              ),
-            ],
+          
+          // Retro Search Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: AppTheme.retroInputDecoration(
+                      labelText: 'SEARCH LOCATION',
+                      hintText: 'Enter location name...',
+                    ).copyWith(
+                      prefixIcon: Icon(Icons.search, color: AppTheme.secondaryColor),
+                    ),
+                    style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+                    onSubmitted: (_) => _searchLocation(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                  child: IconButton(
+                    onPressed: _getCurrentLocation,
+                    icon: Icon(Icons.my_location, color: AppTheme.primaryColor),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.backgroundColor,
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    );
+          
+          // Map with retro styling
+          Container(
+            height: 300, // Fixed height to prevent overflow
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            child: ClipRect(
+              child: GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: _center,
+                  zoom: _zoom,
+                ),
+                onTap: _onMapTap,
+                markers: _markers,
+                circles: _circles,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+              ),
+            ),
+          ),
+          
+          // Retro Area Radius Slider
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.radio_button_checked,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'EVENT AREA RADIUS',
+                      style: AppTheme.retroSubtitle.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontSize: 18,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                  child: Text(
+                    '${_selectedAreaRadius.round()} METERS',
+                    style: AppTheme.retroTitle.copyWith(
+                      fontSize: 24,
+                      color: AppTheme.secondaryColor,
+                      letterSpacing: 2.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Slider(
+                  value: _selectedAreaRadius,
+                  min: 50.0,
+                  max: 500.0,
+                  divisions: 45,
+                  activeColor: AppTheme.primaryColor,
+                  inactiveColor: AppTheme.surfaceColor.withOpacity(0.5),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedAreaRadius = value;
+                      if (_selectedAreaCenter != null) {
+                        _circles.clear();
+                        _circles.add(
+                          Circle(
+                            circleId: const CircleId('event_area'),
+                            center: _selectedAreaCenter!,
+                            radius: _selectedAreaRadius,
+                            fillColor: AppTheme.primaryColor.withValues(alpha: 0.3),
+                            strokeColor: AppTheme.primaryColor,
+                            strokeWidth: 2,
+                          ),
+                        );
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Drag to adjust the radius of your event area',
+                  style: AppTheme.retroBody.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ));
   }
 
   Widget _buildBoundaryConfigurationStep() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 40), // Add bottom padding
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Boundary Configuration',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          // Retro Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.settings,
+                  color: AppTheme.secondaryColor,
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'BOUNDARY CONFIGURATION',
+                  style: AppTheme.retroTitle.copyWith(
+                    fontSize: 20,
+                    color: AppTheme.secondaryColor,
+                    letterSpacing: 2.0,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Configure how users will claim your NFTs',
+                  style: AppTheme.retroBody.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
           
-          // Boundary Radius
+          // Boundary Radius Configuration
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white30),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Boundary Claim Radius: ${_boundaryRadius.round()}m',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.radio_button_checked,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'CLAIM RADIUS',
+                      style: AppTheme.retroSubtitle.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontSize: 18,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                  child: Text(
+                    '${_boundaryRadius.round()} METERS',
+                    style: AppTheme.retroTitle.copyWith(
+                      fontSize: 28,
+                      color: AppTheme.accentColor,
+                      letterSpacing: 2.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Slider(
                   value: _boundaryRadius,
                   min: 1.0,
                   max: 5.0,
                   divisions: 4,
                   activeColor: AppTheme.primaryColor,
+                  inactiveColor: AppTheme.surfaceColor.withOpacity(0.5),
                   onChanged: (value) {
                     setState(() {
                       _boundaryRadius = value;
                     });
                   },
                 ),
-                const Text(
-                  'Users must be within this radius to claim the NFT',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Preview
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white30),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Event Summary',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                _buildSummaryRow('Event Title', _nameController.text),
-                _buildSummaryRow('NFT Supply', '${_nftSupplyController.text} NFTs'),
-                _buildSummaryRow('Claim Radius', '${_boundaryRadius.round()}m'),
-                _buildSummaryRow('Event Area', '${_selectedAreaRadius.round()}m radius'),
-                if (_startDate != null && _startTime != null)
-                  _buildSummaryRow('Start', '${DateFormat('MMM dd, yyyy').format(_startDate!)} at ${_startTime!.format(context)}'),
-                if (_endDate != null && _endTime != null)
-                  _buildSummaryRow('End', '${DateFormat('MMM dd, yyyy').format(_endDate!)} at ${_endTime!.format(context)}'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBoundaryPlacementStep() {
-    final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
-    
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                'Place $nftSupplyCount Boundary Locations',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap on the map to place boundary locations. Each location will have one NFT.',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: _boundaryLocations.length / nftSupplyCount,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_boundaryLocations.length}/$nftSupplyCount boundaries placed',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-        
-        // Map
-        Expanded(
-          child: GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(
-              target: _center,
-              zoom: _zoom,
-            ),
-            onTap: _onMapTap,
-            markers: _markers,
-            circles: _circles,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-          ),
-        ),
-        
-        // Instructions
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: AppTheme.primaryColor, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
                   child: Text(
-                    'Tap on the map to place boundary locations. Each green marker represents one NFT location.',
-                    style: TextStyle(color: AppTheme.primaryColor, fontSize: 12),
+                    'Users must be within this radius to claim the NFT',
+                    style: AppTheme.retroBody.copyWith(
+                      color: AppTheme.textColor.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
             ),
           ),
+          
+          // Event Summary Preview
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.summarize,
+                      color: AppTheme.accentColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'EVENT SUMMARY',
+                      style: AppTheme.retroSubtitle.copyWith(
+                        color: AppTheme.accentColor,
+                        fontSize: 18,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildRetroSummaryRow('Event Title', _nameController.text),
+                _buildRetroSummaryRow('NFT Supply', '${_nftSupplyController.text} NFTs'),
+                _buildRetroSummaryRow('Claim Radius', '${_boundaryRadius.round()}m'),
+                _buildRetroSummaryRow('Event Area', '${_selectedAreaRadius.round()}m radius'),
+                if (_startDate != null && _startTime != null)
+                  _buildRetroSummaryRow('Start', '${DateFormat('MMM dd, yyyy').format(_startDate!)} at ${_startTime!.format(context)}'),
+                if (_endDate != null && _endTime != null)
+                  _buildRetroSummaryRow('End', '${DateFormat('MMM dd, yyyy').format(_endDate!)} at ${_endTime!.format(context)}'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildBoundaryPlacementStep() {
+    final nftSupplyCount = int.tryParse(_nftSupplyController.text) ?? 50;
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 40), // Add bottom padding
+        child: Column(
+        children: [
+          // Retro Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: AppTheme.accentColor,
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'PLACE BOUNDARY LOCATIONS',
+                  style: AppTheme.retroTitle.copyWith(
+                    fontSize: 20,
+                    color: AppTheme.accentColor,
+                    letterSpacing: 2.0,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap on the map or use current location to place $nftSupplyCount NFT locations',
+                  style: AppTheme.retroBody.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          
+          // Progress Section
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.track_changes,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'PLACEMENT PROGRESS',
+                      style: AppTheme.retroSubtitle.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontSize: 16,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                  child: Text(
+                    '${_boundaryLocations.length} / $nftSupplyCount',
+                    style: AppTheme.retroTitle.copyWith(
+                      fontSize: 32,
+                      color: AppTheme.secondaryColor,
+                      letterSpacing: 2.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+                  child: ClipRect(
+                    child: LinearProgressIndicator(
+                      value: _boundaryLocations.length / nftSupplyCount,
+                      backgroundColor: AppTheme.surfaceColor.withOpacity(0.3),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'BOUNDARIES PLACED',
+                  style: AppTheme.retroButton.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.7),
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Action Buttons
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_location,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'PLACEMENT TOOLS',
+                      style: AppTheme.retroSubtitle.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontSize: 16,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                        child: ElevatedButton.icon(
+                          onPressed: _addNFTAtCurrentLocation,
+                          icon: Icon(Icons.my_location, color: AppTheme.backgroundColor),
+                          label: Text(
+                            'ADD AT CURRENT LOCATION',
+                            textAlign: TextAlign.start,
+                            style: AppTheme.retroButton.copyWith(
+                              color: AppTheme.primaryColor,
+
+                              fontSize: 12,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                      child: IconButton(
+                        onPressed: _getCurrentLocation,
+                        icon: Icon(Icons.refresh, color: AppTheme.accentColor),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppTheme.backgroundColor,
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (_boundaryLocations.isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    decoration: AppTheme.retroPixelBorder(AppTheme.errorColor.withOpacity(0.3)),
+                    child: ElevatedButton.icon(
+                      onPressed: _clearAllBoundaries,
+                      icon: Icon(Icons.clear_all, color: AppTheme.primaryColor),
+                      label: Text(
+                        'CLEAR ALL BOUNDARIES',
+                        style: AppTheme.retroButton.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Use current location or tap on map to place boundaries',
+                  style: AppTheme.retroBody.copyWith(
+                    color: AppTheme.textColor.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          
+          // Map
+          Container(
+            height: 300, // Fixed height to prevent overflow
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: ClipRect(
+              child: GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: _center,
+                  zoom: _zoom,
+                ),
+                onTap: _onMapTap,
+                markers: _markers,
+                circles: _circles,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true, // Enable my location button for better UX
+                zoomControlsEnabled: true, // Enable zoom controls
+                mapToolbarEnabled: true, // Enable map toolbar for better interaction
+                zoomGesturesEnabled: true, // Enable pinch to zoom
+                scrollGesturesEnabled: true, // Enable scroll gestures
+                rotateGesturesEnabled: true, // Enable rotate gestures
+                tiltGesturesEnabled: true, // Enable tilt gestures
+              ),
+            ),
+          ),
+          
+          // Instructions
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                  child: Icon(
+                    Icons.info_outline,
+                    color: AppTheme.accentColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PLACEMENT INSTRUCTIONS',
+                        style: AppTheme.retroButton.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap on the map or use the "ADD AT CURRENT LOCATION" button to place boundary locations. Each green marker represents one NFT location.',
+                        style: AppTheme.retroBody.copyWith(
+                          color: AppTheme.textColor.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         ),
-      ],
+        
+      ),
     );
   }
 
@@ -932,6 +1633,35 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     );
   }
 
+  Widget _buildRetroSummaryRow(String label, String value) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.2)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTheme.retroButton.copyWith(
+              color: AppTheme.textColor.withOpacity(0.8),
+              fontSize: 12,
+              letterSpacing: 1.0,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTheme.retroBody.copyWith(
+              color: AppTheme.textColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _createEvent() async {
     print('Creating event...');
     print('Current step: $_currentStep');
@@ -941,6 +1671,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     if (_currentStep == 0 && _formKey.currentState != null) {
       if (!_formKey.currentState!.validate()) {
         print('Form validation failed');
+        _showRetroError('Please complete all required fields correctly');
         return;
       }
     }
@@ -959,31 +1690,39 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         _venueController.text.isEmpty || 
         _nftImagePath == null) {
       print('Missing required data');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete all required fields in step 1'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showRetroError('Please complete all required fields in step 1');
       return;
     }
     
     if (_boundaryLocations.length < nftSupplyCount) {
       print('Not enough boundary locations placed');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please place all $nftSupplyCount boundary locations'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showRetroError('Please place all $nftSupplyCount boundary locations');
       return;
     }
     
     setState(() => _isLoading = true);
     
     try {
-      final walletService = WalletService();
-      final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet';
+      // Get the wallet connection state from the provider
+      final walletState = ref.read(walletConnectionProvider);
+      final walletNotifier = ref.read(walletConnectionProvider.notifier);
+      final appKitModal = ref.read(reownAppKitProvider);
+      
+      print('Wallet connection state:');
+      print('- isConnected: ${walletState.isConnected}');
+      print('- walletAddress: ${walletState.walletAddress}');
+      print('- chainId: ${walletState.chainId}');
+      print('- isWalletReady: ${walletNotifier.isWalletReady()}');
+      print('- appKitModal: ${appKitModal != null ? 'exists' : 'null'}');
+      
+      // Check if wallet is properly connected and ready
+      if (!walletNotifier.isWalletReady()) {
+        _showRetroError('Wallet not properly connected. Please reconnect your wallet to create events on the blockchain.');
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      final walletAddress = walletState.walletAddress ?? 'demo_wallet';
       
       // Create boundaries from placed locations
       final boundaries = _boundaryLocations.asMap().entries.map((entry) {
@@ -1032,130 +1771,221 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         eventImageUrl: _nftImagePath,
       );
       
-      // Save to Supabase
+      // Step 1: Create event on blockchain
+      print('Creating event on blockchain...');
+      final smartContractService = SmartContractService();
+      
+      // Set the app kit modal in the smart contract service
+      if (appKitModal != null) {
+        smartContractService.setAppKitModal(appKitModal);
+        print('AppKit modal set successfully');
+        
+        // Verify wallet is ready for transactions
+        if (!smartContractService.isWalletReady()) {
+          final status = smartContractService.getWalletStatus();
+          print('Smart contract service wallet status: $status');
+          _showRetroError('Wallet not ready for transactions. Please reconnect your wallet.');
+          setState(() => _isLoading = false);
+          return;
+        }
+      } else {
+        print('AppKit modal is null - wallet may not be properly connected');
+        _showRetroError('Wallet connection issue. Please reconnect your wallet.');
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      final blockchainResult = await smartContractService.createEventOnBlockchain(
+        name: event.name,
+        description: event.description,
+        venue: event.venueName,
+        startTime: event.startDate ?? DateTime.now(),
+        endTime: event.endDate ?? DateTime.now().add(const Duration(days: 1)),
+        totalNFTs: event.nftSupplyCount,
+        metadataURI: event.eventImageUrl ?? '',
+        eventCode: event.eventCode,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        radius: _selectedAreaRadius,
+      );
+      
+      if (!blockchainResult['success']) {
+        throw Exception('Blockchain transaction failed: ${blockchainResult['error']}');
+      }
+      
+      print('Event created on blockchain: ${blockchainResult['transactionHash']}');
+      
+      // Step 2: Save to Supabase with blockchain transaction hash
       final supabaseService = SupabaseService();
       final createdEvent = await supabaseService.createEvent(event);
       
+      // Step 3: Mint boundary NFTs on blockchain
+      print('Minting boundary NFTs on blockchain...');
+      final mintResult = await smartContractService.mintBoundaryNFTs(
+        eventId: int.parse(createdEvent.id), // Assuming ID is numeric
+        boundaries: boundaries.map((b) => {
+          'name': b.name,
+          'description': b.description,
+          'imageUrl': b.imageUrl,
+          'latitude': b.latitude,
+          'longitude': b.longitude,
+          'radius': b.radius,
+        }).toList(),
+      );
+      
+      if (mintResult['success']) {
+        print('Boundary NFTs minted: ${mintResult['successfulMints']}/${mintResult['totalBoundaries']}');
+      } else {
+        print('Warning: Some boundary NFTs failed to mint: ${mintResult['error']}');
+      }
+      
       if (mounted) {
-        _showEventCreatedDialog(createdEvent);
+        _showEventCreatedDialog(createdEvent, blockchainResult['transactionHash']);
       }
     } catch (e) {
+      print('Error creating event: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating event: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _showRetroError('Error creating event: $e');
       }
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _showEventCreatedDialog(Event event) {
+  void _showRetroError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: AppTheme.backgroundColor,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppTheme.errorColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  void _showEventCreatedDialog(Event event, [String? transactionHash]) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
         backgroundColor: AppTheme.backgroundColor,
-        title: Row(
-          children: [
-            Icon(Icons.celebration, color: AppTheme.primaryColor),
-            const SizedBox(width: 8),
-            const Text(
-              'Event Created Successfully!',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Your Event Code:',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.primaryColor),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Icon(
+                Icons.celebration,
+                color: AppTheme.accentColor,
+                size: 32,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
+              const SizedBox(height: 16),
+              Text(
+                'EVENT CREATED!',
+                style: AppTheme.retroTitle.copyWith(
+                  fontSize: 20,
+                  color: AppTheme.primaryColor,
+                  letterSpacing: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              // Event Code
+              Text(
+                'YOUR EVENT CODE',
+                style: AppTheme.retroButton.copyWith(
+                  color: AppTheme.secondaryColor,
+                  fontSize: 14,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Event Code Display
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
                       event.eventCode,
-                      style: const TextStyle(
+                      style: AppTheme.retroTitle.copyWith(
+                        fontSize: 16,
                         color: AppTheme.primaryColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
+                        letterSpacing: 2.0,
+                        fontFamily: 'Courier',
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      // Copy to clipboard
-                      Clipboard.setData(ClipboardData(text: event.eventCode));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Event code copied to clipboard!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.copy, color: AppTheme.primaryColor),
-                  ),
-                ],
+                    const SizedBox(width: 16),
+                    IconButton(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: event.eventCode));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Event code copied to clipboard!'),
+                            backgroundColor: AppTheme.successColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.copy, color: AppTheme.accentColor, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTheme.backgroundColor,
+                        padding: const EdgeInsets.all(8),
+                        minimumSize: const Size(40, 40),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Share this code with participants to join your event and start claiming NFTs!',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.orange, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
+              const SizedBox(height: 24),
+              
+              // Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/wallet/options');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: AppTheme.backgroundColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                  ),
                   child: Text(
-                    'Participants can use this code to join the event and see NFT boundaries in AR.',
-                    style: TextStyle(color: Colors.orange, fontSize: 12),
+                    'JOIN EVENT',
+                    style: AppTheme.retroButton.copyWith(
+                      color: AppTheme.backgroundColor,
+                      fontSize: 14,
+                      letterSpacing: 1.0,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.go('/events');
-            },
-            child: const Text('Go to Events'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Navigate to event join screen with the code
-              context.go('/event-join?code=${event.eventCode}');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            child: const Text('Join Event Now'),
-          ),
-        ],
       ),
     );
   }
@@ -1192,27 +2022,34 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     try {
       final supabaseService = SupabaseService();
       
-      // Create a minimal test event
-      final testEvent = Event(
-        name: 'Test Event',
-        description: 'Test Description',
-        organizerWalletAddress: 'test_wallet',
-        latitude: 37.7749,
-        longitude: -122.4194,
-        venueName: 'Test Venue',
-        boundaries: [],
-        nftSupplyCount: 1,
-      );
+      // Test the minimal event creation method
+      final success = await supabaseService.testMinimalEventCreation();
       
-      final createdEvent = await supabaseService.createEvent(testEvent);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Test event created successfully! Code: ${createdEvent.eventCode}'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test event creation successful! Database connection working.'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        // Show a more detailed error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test failed. Check console for details.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Show Details',
+              textColor: Colors.white,
+              onPressed: () {
+                _showDebugInfo();
+              },
+            ),
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1224,6 +2061,82 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     }
   }
 
+  void _showDebugInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Debug Information'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Error: Test event creation failed'),
+            SizedBox(height: 8),
+            Text('Please check:'),
+            Text('1. Console output for detailed logs'),
+            Text('2. Supabase project configuration'),
+            Text('3. RLS policies and permissions'),
+            Text('4. API keys and project URL'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAuthErrorDetails({String? error}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Anonymous Authentication Failed'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (error != null) ...[
+              Text('Error Details:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Container(
+                padding: EdgeInsets.all(8),
+                margin: EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(error, style: TextStyle(fontSize: 12, fontFamily: 'monospace')),
+              ),
+              SizedBox(height: 8),
+            ],
+            Text('Common Solutions:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('1. Enable Anonymous Signups in Supabase:'),
+            Text('   • Go to Supabase Dashboard'),
+            Text('   • Authentication > Settings'),
+            Text('   • Turn ON "Enable anonymous signups"'),
+            SizedBox(height: 8),
+            Text('2. Check API Keys:'),
+            Text('   • Verify URL and anon key in main.dart'),
+            Text('   • Ensure project is active'),
+            SizedBox(height: 8),
+            Text('3. Check Project Status:'),
+            Text('   • Ensure project is not paused'),
+            Text('   • Check if there are any restrictions'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1233,33 +2146,78 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         elevation: 0,
         title: Text(
           'Create Event (Step ${_currentStep + 1}/$_totalSteps)',
-          style: const TextStyle(color: Colors.white),
+          style: AppTheme.retroSubtitle.copyWith(
+            fontSize: 18,
+            color: AppTheme.primaryColor,
+            shadows: [
+              Shadow(
+                offset: const Offset(2, 2),
+                blurRadius: 0,
+                color: AppTheme.primaryColor.withOpacity(0.5),
+              ),
+            ],
+          ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/wallet/options'),
+                leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, color: AppTheme.primaryColor),
+            onPressed: () => context.go('/wallet/options'),
+          ),
         ),
       ),
       body: Column(
         children: [
-          // Progress indicator
+          // Retro Progress indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: List.generate(_totalSteps, (index) {
-                return Expanded(
-                  child: Container(
-                    height: 4,
-                    margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
-                    decoration: BoxDecoration(
-                      color: index <= _currentStep 
-                          ? AppTheme.primaryColor 
-                          : Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(0), // Pixelated
+              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5), width: 1),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'PROGRESS',
+                  style: AppTheme.retroButton.copyWith(
+                    fontSize: 12,
+                    color: AppTheme.primaryColor,
+                    letterSpacing: 1.5,
                   ),
-                );
-              }),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(_totalSteps, (index) {
+                    return Expanded(
+                      child: Container(
+                        height: 8,
+                        margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
+                        decoration: BoxDecoration(
+                          color: index <= _currentStep 
+                              ? AppTheme.primaryColor 
+                              : AppTheme.surfaceColor.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(0), // Pixelated
+                          border: Border.all(
+                            color: index <= _currentStep 
+                                ? AppTheme.primaryColor 
+                                : AppTheme.primaryColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                          boxShadow: index <= _currentStep ? [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withOpacity(0.6),
+                              offset: const Offset(2, 2),
+                              blurRadius: 0,
+                            ),
+                          ] : null,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
           ),
           
@@ -1291,44 +2249,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       if (_currentStep == _totalSteps - 1)
                         Column(
                           children: [
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  print('Test button pressed!');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Test button works!'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                child: const Text(
-                                  'Test Button (Should Show Snackbar)',
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ElevatedButton(
-                                onPressed: _testCreateMinimalEvent,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                child: const Text(
-                                  'Test Database Connection',
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
-                                ),
-                              ),
-                            ),
+
+                           
+                            
                           ],
                         ),
                     ],
@@ -1337,59 +2260,81 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   children: [
                     if (_currentStep > 0)
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: _previousStep,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Colors.white30),
-                          ),
-                          child: const Text(
-                            'Previous',
-                            style: TextStyle(color: Colors.white),
+                        child: Container(
+                          decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                          child: OutlinedButton(
+                            onPressed: _previousStep,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              side: BorderSide.none,
+                              backgroundColor: AppTheme.surfaceColor.withOpacity(0.3),
+                            ),
+                            child: Text(
+                              'PREVIOUS',
+                              style: AppTheme.retroButton.copyWith(
+                                color: AppTheme.secondaryColor,
+                                fontSize: 14,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     if (_currentStep > 0) const SizedBox(width: 16),
-                                          Expanded(
-                      child: ElevatedButton(
-                        onPressed: _canProceedToNextStep() 
-                            ? (_currentStep == _totalSteps - 1 ? () {
-                                print('Create Event button pressed!');
-                                print('Current step: $_currentStep');
-                                print('Can proceed: ${_canProceedToNextStep()}');
-                                _createEvent();
-                              } : _nextStep)
-                            : null,
+                    Expanded(
+                      child: Container(
+                        decoration: _canProceedToNextStep() 
+                            ? AppTheme.retroAnimatedContainer(
+                                color: AppTheme.primaryColor,
+                                isGlowing: true,
+                              )
+                            : AppTheme.retroPixelBorder(Colors.grey),
+                        child: ElevatedButton(
+                          onPressed: _canProceedToNextStep() 
+                              ? (_currentStep == _totalSteps - 1 ? () {
+                                  print('Create Event button pressed!');
+                                  print('Current step: $_currentStep');
+                                  print('Can proceed: ${_canProceedToNextStep()}');
+                                  _createEvent();
+                                } : _nextStep)
+                              : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _canProceedToNextStep() 
-                                ? AppTheme.primaryColor 
-                                : Colors.grey,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(0), // Pixelated
                             ),
                           ),
                           child: _isLoading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
                                   ),
                                 )
                               : Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
-                                      _currentStep == _totalSteps - 1 ? 'Create Event' : 'Next',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                                      _currentStep == _totalSteps - 1 ? 'CREATE EVENT' : 'NEXT',
+                                      style: AppTheme.retroButton.copyWith(
+                                        color: AppTheme.backgroundColor,
+                                        fontSize: 14,
+                                        letterSpacing: 1.0,
+                                      ),
                                     ),
                                     if (!_canProceedToNextStep()) ...[
                                       const SizedBox(height: 4),
                                       Text(
                                         _getValidationMessage(),
-                                        style: const TextStyle(color: Colors.white70, fontSize: 10),
+                                        style: TextStyle(
+                                          color: AppTheme.backgroundColor.withOpacity(0.7),
+                                          fontSize: 10,
+                                          fontFamily: 'Courier',
+                                        ),
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
@@ -1397,6 +2342,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                                 ),
                         ),
                       ),
+                    )
                     ],
                   ),
                 ],

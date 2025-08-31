@@ -24,9 +24,9 @@ class IPFSService {
   
   // Initialize with API credentials
   void initialize() {
-    _dio.options.connectTimeout = const Duration(seconds: 30);
-    _dio.options.receiveTimeout = const Duration(seconds: 30);
-    _dio.options.sendTimeout = const Duration(seconds: 30);
+    _dio.options.connectTimeout = const Duration(seconds: 30).inMilliseconds;
+    _dio.options.receiveTimeout = const Duration(seconds: 30).inMilliseconds;
+    _dio.options.sendTimeout = const Duration(seconds: 30).inMilliseconds;
   }
 
   // Upload a single file to IPFS via Pinata
