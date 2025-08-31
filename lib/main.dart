@@ -70,7 +70,7 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
     final router = ref.watch(appRouterProvider);
     
     return MaterialApp.router(
-      title: 'FaceReflector',
+      title: 'TOKON',
       debugShowCheckedModeBanner: false,
       // theme: AppTheme.lightTheme,
       // darkTheme: AppTheme.darkTheme,

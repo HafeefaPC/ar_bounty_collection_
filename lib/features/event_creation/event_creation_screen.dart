@@ -12,9 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../shared/services/supabase_service.dart';
-import '../../../shared/services/wallet_service.dart';
-import '../../../shared/services/smart_contract_service.dart';
-import '../../../shared/providers/reown_provider.dart';
+
 import 'package:geocoding/geocoding.dart';
 
 class EventCreationScreen extends ConsumerStatefulWidget {
@@ -73,14 +71,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
-    _initializeWalletService();
   }
 
-  Future<void> _initializeWalletService() async {
-    // No need to initialize wallet service here anymore
-    // It's handled by the AppProviderWrapper
-    debugPrint('Wallet service initialization skipped - handled by provider wrapper');
-  }
+
 
   @override
   void dispose() {
@@ -464,15 +457,46 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+        maxWidth: 512, // Reduced for better AR performance
+        maxHeight: 512, // Reduced for better AR performance
+        imageQuality: 90, // Increased quality for better AR display
       );
 
       if (image != null) {
         setState(() {
           _nftImagePath = image.path;
         });
+        
+        // Show image size info
+        if (mounted) {
+          final file = File(image.path);
+          final sizeInBytes = await file.length();
+          final sizeInKB = (sizeInBytes / 1024).round();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: AppTheme.backgroundColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'NFT image selected! Size: ${sizeInKB}KB (Optimized for AR)',
+                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.successColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -967,6 +991,45 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                           ),
                         ],
                       ),
+              ),
+            ),
+            
+            // Image Requirements Info
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: AppTheme.retroPixelBorder(AppTheme.accentColor.withOpacity(0.3)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppTheme.accentColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AR-OPTIMIZED IMAGE REQUIREMENTS',
+                        style: AppTheme.retroButton.copyWith(
+                          color: AppTheme.accentColor,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '• Size: 512x512 pixels (optimal for AR display)\n• Format: JPG/PNG\n• Quality: High (90%)\n• Max file size: ~200KB for best performance',
+                    style: AppTheme.retroBody.copyWith(
+                      color: AppTheme.textColor.withOpacity(0.8),
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1703,26 +1766,25 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     setState(() => _isLoading = true);
     
     try {
-      // Get the wallet connection state from the provider
-      final walletState = ref.read(walletConnectionProvider);
-      final walletNotifier = ref.read(walletConnectionProvider.notifier);
-      final appKitModal = ref.read(reownAppKitProvider);
+      // Use a demo wallet address since we're not using real wallet
+      final walletAddress = 'demo_wallet_${DateTime.now().millisecondsSinceEpoch}';
       
-      print('Wallet connection state:');
-      print('- isConnected: ${walletState.isConnected}');
-      print('- walletAddress: ${walletState.walletAddress}');
-      print('- chainId: ${walletState.chainId}');
-      print('- isWalletReady: ${walletNotifier.isWalletReady()}');
-      print('- appKitModal: ${appKitModal != null ? 'exists' : 'null'}');
-      
-      // Check if wallet is properly connected and ready
-      if (!walletNotifier.isWalletReady()) {
-        _showRetroError('Wallet not properly connected. Please reconnect your wallet to create events on the blockchain.');
-        setState(() => _isLoading = false);
-        return;
+      // First, upload the NFT image to Supabase storage
+      String? uploadedImageUrl;
+      if (_nftImagePath != null) {
+        try {
+          print('Uploading NFT image to Supabase storage...');
+          final supabaseService = SupabaseService();
+          final fileName = 'nft_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          uploadedImageUrl = await supabaseService.uploadImage(_nftImagePath!, fileName);
+          print('Image uploaded successfully: $uploadedImageUrl');
+        } catch (e) {
+          print('Error uploading image: $e');
+          _showRetroError('Failed to upload image. Please try again.');
+          setState(() => _isLoading = false);
+          return;
+        }
       }
-      
-      final walletAddress = walletState.walletAddress ?? 'demo_wallet';
       
       // Create boundaries from placed locations
       final boundaries = _boundaryLocations.asMap().entries.map((entry) {
@@ -1732,7 +1794,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         return Boundary(
           name: 'Boundary ${index + 1}',
           description: 'NFT Boundary ${index + 1}',
-          imageUrl: _nftImagePath ?? 'default_nft_image',
+          imageUrl: uploadedImageUrl ?? 'default_nft_image',
           latitude: location.latitude,
           longitude: location.longitude,
           radius: _boundaryRadius,
@@ -1768,79 +1830,18 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               )
             : null,
         nftSupplyCount: nftSupplyCount,
-        eventImageUrl: _nftImagePath,
+        eventImageUrl: uploadedImageUrl,
       );
       
-      // Step 1: Create event on blockchain
-      print('Creating event on blockchain...');
-      final smartContractService = SmartContractService();
-      
-      // Set the app kit modal in the smart contract service
-      if (appKitModal != null) {
-        smartContractService.setAppKitModal(appKitModal);
-        print('AppKit modal set successfully');
-        
-        // Verify wallet is ready for transactions
-        if (!smartContractService.isWalletReady()) {
-          final status = smartContractService.getWalletStatus();
-          print('Smart contract service wallet status: $status');
-          _showRetroError('Wallet not ready for transactions. Please reconnect your wallet.');
-          setState(() => _isLoading = false);
-          return;
-        }
-      } else {
-        print('AppKit modal is null - wallet may not be properly connected');
-        _showRetroError('Wallet connection issue. Please reconnect your wallet.');
-        setState(() => _isLoading = false);
-        return;
-      }
-      
-      final blockchainResult = await smartContractService.createEventOnBlockchain(
-        name: event.name,
-        description: event.description,
-        venue: event.venueName,
-        startTime: event.startDate ?? DateTime.now(),
-        endTime: event.endDate ?? DateTime.now().add(const Duration(days: 1)),
-        totalNFTs: event.nftSupplyCount,
-        metadataURI: event.eventImageUrl ?? '',
-        eventCode: event.eventCode,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        radius: _selectedAreaRadius,
-      );
-      
-      if (!blockchainResult['success']) {
-        throw Exception('Blockchain transaction failed: ${blockchainResult['error']}');
-      }
-      
-      print('Event created on blockchain: ${blockchainResult['transactionHash']}');
-      
-      // Step 2: Save to Supabase with blockchain transaction hash
+      // Save event to Supabase only (no blockchain)
+      print('Saving event to database...');
       final supabaseService = SupabaseService();
       final createdEvent = await supabaseService.createEvent(event);
       
-      // Step 3: Mint boundary NFTs on blockchain
-      print('Minting boundary NFTs on blockchain...');
-      final mintResult = await smartContractService.mintBoundaryNFTs(
-        eventId: int.parse(createdEvent.id), // Assuming ID is numeric
-        boundaries: boundaries.map((b) => {
-          'name': b.name,
-          'description': b.description,
-          'imageUrl': b.imageUrl,
-          'latitude': b.latitude,
-          'longitude': b.longitude,
-          'radius': b.radius,
-        }).toList(),
-      );
-      
-      if (mintResult['success']) {
-        print('Boundary NFTs minted: ${mintResult['successfulMints']}/${mintResult['totalBoundaries']}');
-      } else {
-        print('Warning: Some boundary NFTs failed to mint: ${mintResult['error']}');
-      }
+      print('Event created successfully with ID: ${createdEvent.id}');
       
       if (mounted) {
-        _showEventCreatedDialog(createdEvent, blockchainResult['transactionHash']);
+        _showEventCreatedDialog(createdEvent);
       }
     } catch (e) {
       print('Error creating event: $e');
@@ -1878,7 +1879,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     );
   }
 
-  void _showEventCreatedDialog(Event event, [String? transactionHash]) {
+  void _showEventCreatedDialog(Event event) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1952,6 +1953,34 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                         backgroundColor: AppTheme.backgroundColor,
                         padding: const EdgeInsets.all(8),
                         minimumSize: const Size(40, 40),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Local Event Notice
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: AppTheme.retroPixelBorder(AppTheme.accentColor.withOpacity(0.3)),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppTheme.accentColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Event created successfully!',
+                        style: AppTheme.retroBody.copyWith(
+                          color: AppTheme.accentColor,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
@@ -2147,7 +2176,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         title: Text(
           'Create Event (Step ${_currentStep + 1}/$_totalSteps)',
           style: AppTheme.retroSubtitle.copyWith(
-            fontSize: 18,
+            fontSize: 15,
             color: AppTheme.primaryColor,
             shadows: [
               Shadow(
@@ -2158,6 +2187,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             ],
           ),
         ),
+        
                 leading: Container(
           margin: const EdgeInsets.all(8),
           decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),

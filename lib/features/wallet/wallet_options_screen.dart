@@ -216,7 +216,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         SizedBox(width: screenWidth * 0.04),
         Expanded(
           child: Text(
-            'WELCOME TO FACEREFLECTOR',
+            'WELCOME TO TOKON',
             style: AppTheme.retroTitle.copyWith(
               fontSize: screenWidth * 0.065,
               color: AppTheme.textColor,

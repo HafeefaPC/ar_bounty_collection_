@@ -27,6 +27,6 @@ void main() {
     await tester.pumpAndSettle();
     
     // Verify that the app title is displayed
-    expect(find.text('FaceReflector'), findsOneWidget);
+    expect(find.text('TOKON'), findsOneWidget);
   });
 }
