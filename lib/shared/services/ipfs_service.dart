@@ -1,445 +1,246 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:crypto/crypto.dart';
+import 'package:mime/mime.dart';
+import 'package:path/path.dart' as path;
+import 'package:http_parser/http_parser.dart';
 
 class IPFSService {
-  static final IPFSService _instance = IPFSService._internal();
-  factory IPFSService() => _instance;
-  IPFSService._internal();
-
-  final Dio _dio = Dio();
-  
-  // Using Pinata as IPFS provider
+  // Using Pinata as IPFS provider (you'll need to get API keys)
   static const String _pinataApiUrl = 'https://api.pinata.cloud';
-  static const String _pinataGatewayUrl = 'https://gateway.pinata.cloud';
+  static const String _pinataGatewayUrl = 'https://gateway.pinata.cloud/ipfs';
   
-  // Alternative: Web3.Storage (reserved for future implementation)
-  // ignore: unused_field
-  static const String _web3StorageApiUrl = 'https://api.web3.storage';
+  // You need to get these from Pinata Cloud (https://pinata.cloud)
+  // For now, using placeholder values - you'll need to replace these
+  static const String _pinataApiKey = '559204340244924ee65f';
+  static const String _pinataSecretKey = 'f78a3294d53c074d28cd9e9d8fb51fea88e4fb212ff12c0410b8c6a5365d6c6c';
   
-  // Configuration - using provided Pinata credentials
-  static const String _pinataJWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI3YzE1NGViNy00ODVjLTQyMGMtODMzNy03ZDg4N2RjMGFhZWUiLCJlbWFpbCI6ImFhemltYW5pc2hnZGV2QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiI5OTFmMDQ0YzZlMTY2MzgyMzc2YSIsInNjb3BlZEtleVNlY3JldCI6IjIwZjUyMzRlYWExNzEwOWE5OGQ1NDlkNTZmZTk0YTllMjczY2VhY2I2OThiMjRlMDEzMjQ4MTZiMTIxNThkMjAiLCJleHAiOjE3ODgwOTEzNTB9.tqTP-KB7qLh0xTEPwxPhoKmrqC4NDY7jKEUY-PEr1D0';
+  late Dio _dio;
   
-  // Initialize with API credentials
-  void initialize() {
-    _dio.options.connectTimeout = const Duration(seconds: 30).inMilliseconds;
-    _dio.options.receiveTimeout = const Duration(seconds: 30).inMilliseconds;
-    _dio.options.sendTimeout = const Duration(seconds: 30).inMilliseconds;
+  IPFSService() {
+    _dio = Dio();
+    _dio.options.baseUrl = _pinataApiUrl;
+    _dio.options.headers = {
+      'pinata_api_key': _pinataApiKey,
+      'pinata_secret_api_key': _pinataSecretKey,
+    };
   }
-
-  // Upload a single file to IPFS via Pinata
-  Future<String> uploadFile(
-    File file, {
-    String? name,
-    Map<String, dynamic>? metadata,
-    bool pin = true,
-  }) async {
-
+  
+  // Upload file to IPFS
+  Future<String> uploadFile(String filePath, {String? customName}) async {
     try {
-      final fileName = name ?? file.path.split('/').last;
+      print('📤 IPFSService: Uploading file to IPFS...');
+      print('File path: $filePath');
       
+      final file = File(filePath);
+      if (!await file.exists()) {
+        throw Exception('File does not exist: $filePath');
+      }
+      
+      final fileName = customName ?? path.basename(filePath);
+      final mimeType = lookupMimeType(filePath) ?? 'application/octet-stream';
+      
+      // Create form data
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
-          file.path,
+          filePath,
           filename: fileName,
+          contentType: MediaType.parse(mimeType),
         ),
-        if (metadata != null)
-          'pinataMetadata': jsonEncode({
-            'name': fileName,
-            ...metadata,
-          }),
-        if (pin)
-          'pinataOptions': jsonEncode({
-            'cidVersion': 1,
-          }),
+        'pinataMetadata': jsonEncode({
+          'name': fileName,
+          'keyvalues': {
+            'app': 'face_reflector',
+            'type': 'nft_image',
+            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          }
+        }),
+        'pinataOptions': jsonEncode({
+          'cidVersion': 1,
+        }),
       });
-
-      final response = await _dio.post(
-        '$_pinataApiUrl/pinning/pinFileToIPFS',
-        data: formData,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_pinataJWT',
-            'Content-Type': 'multipart/form-data',
-          },
-        ),
-      );
-
+      
+      final response = await _dio.post('/pinning/pinFileToIPFS', data: formData);
+      
       if (response.statusCode == 200) {
-        final result = response.data;
-        return result['IpfsHash'] as String;
+        final ipfsHash = response.data['IpfsHash'] as String;
+        final ipfsUrl = '$_pinataGatewayUrl/$ipfsHash';
+        
+        print('✅ IPFSService: File uploaded successfully');
+        print('IPFS Hash: $ipfsHash');
+        print('IPFS URL: $ipfsUrl');
+        
+        return ipfsUrl;
       } else {
         throw Exception('Failed to upload file: ${response.statusMessage}');
       }
     } catch (e) {
-      print('IPFS upload error: $e');
-      throw Exception('Failed to upload file to IPFS: $e');
+      print('❌ IPFSService: Error uploading file: $e');
+      rethrow;
     }
   }
-
+  
   // Upload JSON metadata to IPFS
-  Future<String> uploadJson(
-    Map<String, dynamic> jsonData, {
-    String? name,
-    Map<String, dynamic>? metadata,
-  }) async {
-
+  Future<String> uploadMetadata(Map<String, dynamic> metadata) async {
     try {
-      final metadataName = name ?? 'metadata-${DateTime.now().millisecondsSinceEpoch}';
+      print('📤 IPFSService: Uploading metadata to IPFS...');
       
-      final requestData = {
-        'pinataContent': jsonData,
-        'pinataMetadata': {
-          'name': metadataName,
-          if (metadata != null) ...metadata,
-        },
-        'pinataOptions': {
-          'cidVersion': 1,
-        },
-      };
-
-      final response = await _dio.post(
-        '$_pinataApiUrl/pinning/pinJSONToIPFS',
-        data: requestData,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_pinataJWT',
-            'Content-Type': 'application/json',
-          },
+      final metadataJson = jsonEncode(metadata);
+      final fileName = 'metadata_${DateTime.now().millisecondsSinceEpoch}.json';
+      
+      // Create form data
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromString(
+          metadataJson,
+          filename: fileName,
+          contentType: MediaType.parse('application/json'),
         ),
-      );
-
+        'pinataMetadata': jsonEncode({
+          'name': fileName,
+          'keyvalues': {
+            'app': 'face_reflector',
+            'type': 'metadata',
+            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          }
+        }),
+        'pinataOptions': jsonEncode({
+          'cidVersion': 1,
+        }),
+      });
+      
+      final response = await _dio.post('/pinning/pinFileToIPFS', data: formData);
+      
       if (response.statusCode == 200) {
-        final result = response.data;
-        return result['IpfsHash'] as String;
+        final ipfsHash = response.data['IpfsHash'] as String;
+        final ipfsUrl = '$_pinataGatewayUrl/$ipfsHash';
+        
+        print('✅ IPFSService: Metadata uploaded successfully');
+        print('IPFS Hash: $ipfsHash');
+        print('IPFS URL: $ipfsUrl');
+        
+        return ipfsUrl;
       } else {
-        throw Exception('Failed to upload JSON: ${response.statusMessage}');
+        throw Exception('Failed to upload metadata: ${response.statusMessage}');
       }
     } catch (e) {
-      print('IPFS JSON upload error: $e');
-      throw Exception('Failed to upload JSON to IPFS: $e');
+      print('❌ IPFSService: Error uploading metadata: $e');
+      rethrow;
     }
   }
-
-  // Retrieve content from IPFS
+  
+  // Create NFT metadata JSON
+  Map<String, dynamic> createNFTMetadata({
+    required String name,
+    required String description,
+    required String imageUrl,
+    required Map<String, dynamic> attributes,
+    String? externalUrl,
+  }) {
+    return {
+      'name': name,
+      'description': description,
+      'image': imageUrl,
+      'external_url': externalUrl,
+      'attributes': attributes.entries.map((entry) => {
+        'trait_type': entry.key,
+        'value': entry.value,
+      }).toList(),
+      'background_color': '000000',
+      'animation_url': null,
+      'youtube_url': null,
+    };
+  }
+  
+  // Create event metadata JSON
+  Map<String, dynamic> createEventMetadata({
+    required String name,
+    required String description,
+    required String organizer,
+    required double latitude,
+    required double longitude,
+    required String venue,
+    required int nftSupplyCount,
+    required String imageUrl,
+    required List<Map<String, dynamic>> boundaries,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return {
+      'name': name,
+      'description': description,
+      'organizer': organizer,
+      'location': {
+        'latitude': latitude,
+        'longitude': longitude,
+        'venue': venue,
+      },
+      'nft_supply_count': nftSupplyCount,
+      'image': imageUrl,
+      'boundaries': boundaries,
+      'start_date': startDate?.toIso8601String(),
+      'end_date': endDate?.toIso8601String(),
+      'created_at': DateTime.now().toIso8601String(),
+      'version': '1.0.0',
+    };
+  }
+  
+  // Get file from IPFS
+  Future<String> getFileFromIPFS(String ipfsHash) async {
+    try {
+      final response = await _dio.get('/$ipfsHash');
+      return response.data;
+    } catch (e) {
+      print('❌ IPFSService: Error getting file from IPFS: $e');
+      rethrow;
+    }
+  }
+  
+  // Get JSON data from IPFS
   Future<Map<String, dynamic>?> getJson(String cid) async {
     try {
-      final response = await _dio.get(
-        '$_pinataGatewayUrl/ipfs/$cid',
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
+      print('📥 IPFSService: Fetching JSON from IPFS...');
+      print('CID: $cid');
+      
+      final response = await _dio.get('$_pinataGatewayUrl/$cid');
+      
       if (response.statusCode == 200) {
-        return response.data is String 
-            ? jsonDecode(response.data) 
-            : response.data as Map<String, dynamic>;
-      } else {
-        throw Exception('Failed to retrieve JSON: ${response.statusMessage}');
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          print('✅ IPFSService: JSON fetched successfully');
+          return data;
+        } else if (data is String) {
+          print('✅ IPFSService: JSON string fetched, parsing...');
+          return jsonDecode(data) as Map<String, dynamic>;
+        }
       }
+      
+      print('❌ IPFSService: Failed to fetch JSON - Status: ${response.statusCode}');
+      return null;
     } catch (e) {
-      print('IPFS retrieve error: $e');
+      print('❌ IPFSService: Error fetching JSON: $e');
       return null;
     }
   }
 
-  // Get IPFS URL for a given CID
-  String getIpfsUrl(String cid) {
-    return '$_pinataGatewayUrl/ipfs/$cid';
-  }
-
-  // Upload event metadata to IPFS
-  Future<String> uploadEventMetadata({
-    required String eventId,
-    required String name,
-    required String description,
-    required String venue,
-    required String organizerAddress,
-    required double latitude,
-    required double longitude,
-    required List<Map<String, dynamic>> boundaries,
-    String? imageIpfsHash,
-    Map<String, dynamic>? additionalMetadata,
-  }) async {
-    final eventMetadata = {
-      'name': name,
-      'description': description,
-      'image': imageIpfsHash != null ? 'ipfs://$imageIpfsHash' : null,
-      'external_url': 'https://tokon.app/events/$eventId',
-      'attributes': [
-        {
-          'trait_type': 'Event Type',
-          'value': 'AR Bounty Hunt',
-        },
-        {
-          'trait_type': 'Organizer',
-          'value': organizerAddress,
-        },
-        {
-          'trait_type': 'Total Boundaries',
-          'value': boundaries.length,
-        },
-        {
-          'trait_type': 'Location',
-          'value': venue,
-        },
-      ],
-      'properties': {
-        'event_id': eventId,
-        'organizer': organizerAddress,
-        'venue': {
-          'name': venue,
-          'coordinates': {
-            'latitude': latitude,
-            'longitude': longitude,
-          },
-        },
-        'boundaries': boundaries.map((boundary) => {
-          'id': boundary['id'],
-          'name': boundary['name'],
-          'description': boundary['description'],
-          'location': {
-            'latitude': boundary['latitude'],
-            'longitude': boundary['longitude'],
-            'radius': boundary['radius'],
-          },
-          'image': boundary['imageIpfsHash'] != null 
-              ? 'ipfs://${boundary['imageIpfsHash']}' 
-              : null,
-        }).toList(),
-        'created_at': DateTime.now().toIso8601String(),
-        if (additionalMetadata != null) ...additionalMetadata,
-      },
-    };
-
-    return await uploadJson(
-      eventMetadata,
-      name: 'event-$eventId-metadata',
-      metadata: {
-        'type': 'event_metadata',
-        'event_id': eventId,
-        'created_by': 'tokon_app',
-      },
-    );
-  }
-
-  // Upload NFT metadata to IPFS (ERC721 compatible)
-  Future<String> uploadNFTMetadata({
-    required String tokenId,
-    required String eventId,
-    required String name,
-    required String description,
-    required double latitude,
-    required double longitude,
-    required double radius,
-    String? imageIpfsHash,
-    String? animationIpfsHash,
-    Map<String, dynamic>? additionalAttributes,
-  }) async {
-    final nftMetadata = {
-      'name': name,
-      'description': description,
-      'image': imageIpfsHash != null ? 'ipfs://$imageIpfsHash' : null,
-      if (animationIpfsHash != null) 'animation_url': 'ipfs://$animationIpfsHash',
-      'external_url': 'https://tokon.app/nft/$tokenId',
-      'attributes': [
-        {
-          'trait_type': 'Event ID',
-          'value': eventId,
-        },
-        {
-          'trait_type': 'Location Type',
-          'value': 'AR Boundary',
-        },
-        {
-          'trait_type': 'Claim Radius',
-          'value': '${radius}m',
-        },
-        {
-          'trait_type': 'Latitude',
-          'value': latitude,
-          'display_type': 'number',
-        },
-        {
-          'trait_type': 'Longitude',
-          'value': longitude,
-          'display_type': 'number',
-        },
-        if (additionalAttributes != null)
-          ...additionalAttributes.entries.map((entry) => {
-            'trait_type': entry.key,
-            'value': entry.value,
-          }),
-      ],
-      'properties': {
-        'token_id': tokenId,
-        'event_id': eventId,
-        'location': {
-          'latitude': latitude,
-          'longitude': longitude,
-          'radius': radius,
-        },
-        'minted_at': DateTime.now().toIso8601String(),
-        'blockchain': 'avalanche',
-        'standard': 'ERC721',
-      },
-    };
-
-    return await uploadJson(
-      nftMetadata,
-      name: 'nft-$tokenId-metadata',
-      metadata: {
-        'type': 'nft_metadata',
-        'token_id': tokenId,
-        'event_id': eventId,
-        'created_by': 'tokon_app',
-      },
-    );
-  }
-
-  // Upload image and get IPFS hash
-  Future<String> uploadImage(File imageFile, {String? name}) async {
-    return await uploadFile(
-      imageFile,
-      name: name,
-      metadata: {
-        'type': 'image',
-        'uploaded_by': 'tokon_app',
-      },
-    );
-  }
-
-  // Batch upload multiple files
-  Future<List<String>> uploadFiles(
-    List<File> files, {
-    List<String>? names,
-    Map<String, dynamic>? metadata,
-  }) async {
-    final results = <String>[];
-    
-    for (int i = 0; i < files.length; i++) {
-      final file = files[i];
-      final name = names != null && names.length > i ? names[i] : null;
-      
-      try {
-        final cid = await uploadFile(file, name: name, metadata: metadata);
-        results.add(cid);
-      } catch (e) {
-        print('Failed to upload file ${file.path}: $e');
-        rethrow;
-      }
-    }
-    
-    return results;
-  }
-
-  // Pin existing IPFS content
-  Future<bool> pinByCID(String cid, {String? name}) async {
-
+  // Test IPFS connection
+  Future<bool> testConnection() async {
     try {
-      final requestData = {
-        'hashToPin': cid,
-        if (name != null)
-          'pinataMetadata': {
-            'name': name,
-          },
-      };
-
-      final response = await _dio.post(
-        '$_pinataApiUrl/pinning/pinByHash',
-        data: requestData,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_pinataJWT',
-            'Content-Type': 'application/json',
-          },
-        ),
-      );
-
+      final response = await _dio.get('/data/testAuthentication');
       return response.statusCode == 200;
     } catch (e) {
-      print('IPFS pin error: $e');
+      print('❌ IPFSService: Connection test failed: $e');
       return false;
     }
   }
-
-  // Unpin IPFS content
-  Future<bool> unpin(String cid) async {
-
-    try {
-      final response = await _dio.delete(
-        '$_pinataApiUrl/pinning/unpin/$cid',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_pinataJWT',
-          },
-        ),
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print('IPFS unpin error: $e');
-      return false;
-    }
-  }
-
-  // Get pinned content list
-  Future<List<Map<String, dynamic>>> getPinnedContent({
-    String? status,
-    String? metadata,
-    int? limit,
-    int? offset,
-  }) async {
-
-    try {
-      final queryParams = <String, dynamic>{};
-      if (status != null) queryParams['status'] = status;
-      if (metadata != null) queryParams['metadata'] = metadata;
-      if (limit != null) queryParams['pageLimit'] = limit;
-      if (offset != null) queryParams['pageOffset'] = offset;
-
-      final response = await _dio.get(
-        '$_pinataApiUrl/data/pinList',
-        queryParameters: queryParams,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $_pinataJWT',
-          },
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final result = response.data;
-        return List<Map<String, dynamic>>.from(result['rows'] ?? []);
-      } else {
-        throw Exception('Failed to get pinned content: ${response.statusMessage}');
-      }
-    } catch (e) {
-      print('IPFS pinned content error: $e');
-      return [];
-    }
-  }
-
-  // Generate a hash for content verification
-  String generateContentHash(Uint8List content) {
-    final digest = sha256.convert(content);
-    return digest.toString();
-  }
-
-  // Validate IPFS CID format
-  bool isValidCID(String cid) {
-    // Basic CID validation - can be enhanced
-    return cid.isNotEmpty && 
-           (cid.startsWith('Qm') || cid.startsWith('bafy') || cid.startsWith('bafk'));
-  }
-
-  // Clean up and dispose resources
+  
   void dispose() {
     _dio.close();
+  }
+}
+
+// Extension for MediaType
+extension MediaTypeExtension on String {
+  MediaType parse(String mimeType) {
+    return MediaType.parse(mimeType);
   }
 }

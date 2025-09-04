@@ -5,10 +5,17 @@
   "scripts": {
     "build": "hardhat compile",
     "test": "hardhat test",
+    "deploy:arbitrum-sepolia": "hardhat run scripts/deploy.js --network arbitrumSepolia",
     "deploy:fuji": "hardhat run scripts/deploy.js --network fuji",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "verify": "hardhat verify --network fuji",
-    "clean": "hardhat clean"
+    "deploy:avalanche": "hardhat run scripts/deploy.js --network avalanche",
+    "extract-abis": "node scripts/extract-abis.js",
+    "verify": "hardhat verify --network arbitrumSepolia",
+    "verify:arbitrum-sepolia": "hardhat verify --network arbitrumSepolia",
+    "verify:fuji": "hardhat verify --network fuji",
+    "verify:avalanche": "hardhat verify --network avalanche",
+    "clean": "hardhat clean",
+    "reset": "hardhat clean && hardhat compile"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

@@ -132,7 +132,6 @@ class BlockchainService {
     
     _web3Client = Web3Client(_rpcUrl, Client());
     _ipfsService = IPFSService();
-    _ipfsService.initialize();
   }
 
   // Convert double coordinates to blockchain integers (scaled by 1e6)
@@ -170,39 +169,37 @@ class BlockchainService {
       final boundaryImageHashes = <String>[];
       for (int i = 0; i < boundaryImagePaths.length; i++) {
         final imageFile = File(boundaryImagePaths[i]);
-        final imageHash = await _ipfsService.uploadImage(
-          imageFile,
-          name: 'boundary-${event.id}-$i-image',
+        final imageHash = await _ipfsService.uploadFile(
+          imageFile.path,
+          customName: 'boundary-${event.id}-$i-image',
         );
         boundaryImageHashes.add(imageHash);
       }
 
       // 2. Upload event metadata to IPFS
       print('Uploading event metadata to IPFS...');
-      final eventMetadataHash = await _ipfsService.uploadEventMetadata(
-        eventId: event.id,
+      final eventMetadata = _ipfsService.createEventMetadata(
         name: event.name,
         description: event.description,
-        venue: event.venueName,
-        organizerAddress: EthereumAddress.fromHex(privateKey).hexEip55,
+        organizer: EthereumAddress.fromHex(privateKey).hexEip55,
         latitude: event.latitude,
         longitude: event.longitude,
-        boundaries: event.boundaries.asMap().entries.map((entry) {
-          final index = entry.key;
-          final boundary = entry.value;
-          return {
-            'id': boundary.id,
-            'name': boundary.name,
-            'description': boundary.description,
-            'latitude': boundary.latitude,
-            'longitude': boundary.longitude,
-            'radius': boundary.radius,
-            'imageIpfsHash': index < boundaryImageHashes.length 
-                ? boundaryImageHashes[index] 
-                : null,
-          };
+        venue: event.venueName,
+        nftSupplyCount: event.nftSupplyCount,
+        imageUrl: boundaryImageHashes.isNotEmpty ? boundaryImageHashes.first : 'default_image',
+        boundaries: event.boundaries.map((b) => {
+          'name': b.name,
+          'description': b.description,
+          'latitude': b.latitude,
+          'longitude': b.longitude,
+          'radius': b.radius,
+          'image': boundaryImageHashes.isNotEmpty ? boundaryImageHashes.first : 'default_image',
         }).toList(),
+        startDate: event.startDate,
+        endDate: event.endDate,
       );
+      
+      final eventMetadataHash = await _ipfsService.uploadMetadata(eventMetadata);
 
       // 3. Create event on blockchain
       print('Creating event on blockchain...');
@@ -283,16 +280,20 @@ class BlockchainService {
         final boundary = boundaries[i];
         final imageHash = i < imageHashes.length ? imageHashes[i] : null;
         
-        final metadataHash = await _ipfsService.uploadNFTMetadata(
-          tokenId: '${eventId}_$i',
-          eventId: eventId.toString(),
-          name: boundary.name,
-          description: boundary.description,
-          latitude: boundary.latitude,
-          longitude: boundary.longitude,
-          radius: boundary.radius,
-          imageIpfsHash: imageHash,
-        );
+        final nftMetadata = {
+          'name': boundary.name,
+          'description': boundary.description,
+          'image': imageHash ?? 'default_image',
+          'attributes': [
+            {'trait_type': 'Event ID', 'value': eventId.toString()},
+            {'trait_type': 'Token ID', 'value': '${eventId}_$i'},
+            {'trait_type': 'Latitude', 'value': boundary.latitude.toString()},
+            {'trait_type': 'Longitude', 'value': boundary.longitude.toString()},
+            {'trait_type': 'Radius', 'value': boundary.radius.toString()},
+          ],
+        };
+        
+        final metadataHash = await _ipfsService.uploadMetadata(nftMetadata);
         
         tokenURIs.add('ipfs://$metadataHash');
       }

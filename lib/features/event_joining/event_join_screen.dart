@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:face_reflector/core/theme/app_theme.dart';
 import 'package:face_reflector/core/providers/providers.dart';
+import 'package:face_reflector/shared/widgets/wallet_connection_wrapper.dart';
+import 'package:face_reflector/shared/services/global_wallet_service.dart';
 
 class EventJoinScreen extends ConsumerStatefulWidget {
   final String? initialEventCode;
@@ -43,39 +45,52 @@ class _EventJoinScreenState extends ConsumerState<EventJoinScreen> {
   }
 @override
 Widget build(BuildContext context) {
-  return Scaffold(
-    resizeToAvoidBottomInset: true,
-    body: Container(
-      decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Retro Header
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor,
-                      borderRadius: BorderRadius.circular(0), // Pixelated
-                      border: Border.all(
-                        color: AppTheme.textColor.withOpacity(0.3),
-                        width: 2,
+  // Restore wallet state when the page loads
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    ref.read(globalWalletServiceProvider).restoreWalletState();
+  });
+
+  return WalletConnectionWrapper(
+    requireWallet: true,
+    redirectRoute: '/wallet/connect',
+    child: Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        decoration: AppTheme.modernScaffoldBackground,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Retro Header
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(0), // Pixelated
+                        border: Border.all(
+                          color: AppTheme.textColor.withOpacity(0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: IconButton(
+                        onPressed: () => context.go('/wallet/options'),
+                        icon: Icon(Icons.arrow_back_ios, color: AppTheme.textColor),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppTheme.surfaceColor,
+                        ),
                       ),
                     ),
-                    child: IconButton(
-                      onPressed: () => context.go('/wallet/options'),
-                      icon: Icon(Icons.arrow_back_ios, color: AppTheme.textColor),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppTheme.surfaceColor,
-                      ),
+                    const Spacer(),
+                    // Wallet connection status
+                    WalletConnectionStatus(
+                      showAddress: true,
+                      showDisconnectButton: false,
                     ),
-                  ),
-                  const Spacer(),
-                ],
+                  ],
+                ),
               ),
-            ),
             
             // Scrollable Main Content
             Expanded(
@@ -90,7 +105,7 @@ Widget build(BuildContext context) {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        gradient: AppTheme.retroGradient,
+                        gradient: AppTheme.primaryGradient,
                         borderRadius: BorderRadius.circular(0), // Pixelated
                         border: Border.all(
                           color: AppTheme.textColor,
@@ -121,7 +136,7 @@ Widget build(BuildContext context) {
                     // Retro Title
                     Text(
                       'JOIN EVENT',
-                      style: AppTheme.retroTitle.copyWith(
+                      style: AppTheme.modernTitle.copyWith(
                         fontSize: 28,
                         color: AppTheme.textColor,
                         shadows: [
@@ -145,7 +160,7 @@ Widget build(BuildContext context) {
                     Text(
                       'Enter the event code provided by the organizer to start claiming goodies',
                       textAlign: TextAlign.center,
-                      style: AppTheme.retroBody.copyWith(
+                      style: AppTheme.modernBodySecondary.copyWith(
                         fontSize: 16,
                         color: AppTheme.textColor.withOpacity(0.8),
                         height: 1.5,
@@ -179,7 +194,7 @@ Widget build(BuildContext context) {
                             Expanded(
                               child: Text(
                                 'AUTO-JOINING EVENT: ${widget.initialEventCode}',
-                                style: AppTheme.retroButton.copyWith(
+                                style: AppTheme.modernButton.copyWith(
                                   color: AppTheme.primaryColor,
                                   fontSize: 14,
                                   letterSpacing: 1.0,
@@ -199,13 +214,28 @@ Widget build(BuildContext context) {
                           // Retro Event Code Input
                           TextFormField(
                             controller: _eventCodeController,
-                            decoration: AppTheme.retroInputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'EVENT CODE',
                               hintText: 'e.g., TECH24',
-                              prefixIcon: Icons.qr_code,
+                              prefixIcon: Icon(Icons.qr_code, color: AppTheme.primaryColor),
+                              filled: true,
+                              fillColor: AppTheme.cardColor,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             ),
                             textCapitalization: TextCapitalization.characters,
-                            style: AppTheme.retroBody.copyWith(
+                            style: AppTheme.modernBodySecondary.copyWith(
                               color: AppTheme.textColor,
                               fontSize: 16,
                             ),
@@ -227,7 +257,7 @@ Widget build(BuildContext context) {
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _joinEvent,
-                              style: AppTheme.retroPrimaryButton.copyWith(
+                              style: AppTheme.modernPrimaryButton.copyWith(
                                 backgroundColor: MaterialStateProperty.all(AppTheme.primaryColor),
                                 foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
                               ),
@@ -248,7 +278,7 @@ Widget build(BuildContext context) {
                                         const SizedBox(width: 12),
                                         Text(
                                           'JOINING...',
-                                          style: AppTheme.retroButton.copyWith(
+                                          style: AppTheme.modernButton.copyWith(
                                             fontSize: 16,
                                             color: AppTheme.backgroundColor,
                                           ),
@@ -262,7 +292,7 @@ Widget build(BuildContext context) {
                                         const SizedBox(width: 12),
                                         Text(
                                           'JOIN EVENT',
-                                          style: AppTheme.retroButton.copyWith(
+                                          style: AppTheme.modernButton.copyWith(
                                             fontSize: 16,
                                             color: AppTheme.backgroundColor,
                                           ),
@@ -296,7 +326,7 @@ Widget build(BuildContext context) {
                                     const SizedBox(width: 12),
                                     Text(
                                       'TRY DEMO EVENT (TECH24)',
-                                      style: AppTheme.retroButton.copyWith(
+                                      style: AppTheme.modernButton.copyWith(
                                         color: AppTheme.secondaryColor,
                                         fontSize: 14,
                                         letterSpacing: 1.0,
@@ -332,7 +362,7 @@ Widget build(BuildContext context) {
                 child: Text(
                   'Make sure you\'re at the event venue to claim goodies',
                   textAlign: TextAlign.center,
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     fontSize: 12,
                     color: AppTheme.textColor.withOpacity(0.7),
                   ),
@@ -342,6 +372,7 @@ Widget build(BuildContext context) {
           ],
         ),
       ),
+    ),
     ),
   );
 }

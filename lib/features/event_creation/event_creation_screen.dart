@@ -9,9 +9,15 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/models/event.dart';
+import '../../../shared/models/event.dart' as models;
 import '../../../shared/models/boundary.dart';
 import '../../../shared/services/supabase_service.dart';
+import '../../../shared/widgets/wallet_connection_wrapper.dart';
+import '../../../shared/services/global_wallet_service.dart';
+import '../../../shared/providers/web3_provider.dart';
+import '../../../shared/providers/reown_provider.dart';
+import '../../../shared/services/test_web3_integration.dart';
+import 'package:reown_appkit/reown_appkit.dart';
 
 import 'package:geocoding/geocoding.dart';
 
@@ -173,7 +179,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   Expanded(
                     child: Text(
                       'NFT location added at current position!',
-                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                      style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                     ),
                   ),
                 ],
@@ -199,7 +205,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   Expanded(
                     child: Text(
                       'All NFT locations have been placed!',
-                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                      style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                     ),
                   ),
                 ],
@@ -227,7 +233,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         title: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: AppTheme.retroPixelBorder(AppTheme.errorColor),
+          decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -239,7 +248,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               const SizedBox(width: 8),
               Text(
                 'CLEAR ALL BOUNDARIES',
-                style: AppTheme.retroSubtitle.copyWith(
+                style: AppTheme.modernSubtitle.copyWith(
                   color: AppTheme.errorColor,
                   fontSize: 12,
                   letterSpacing: 0.5,
@@ -250,19 +259,22 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         ),
         content: Text(
           'Are you sure you want to remove all ${_boundaryLocations.length} placed NFT locations? This action cannot be undone.',
-          style: AppTheme.retroBody.copyWith(
+          style: AppTheme.modernBodySecondary.copyWith(
             color: AppTheme.textColor,
             fontSize: 12,
           ),
         ),
         actions: [
           Container(
-            decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'CANCEL',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: AppTheme.textColor.withOpacity(0.8),
                   fontSize: 12,
                   letterSpacing: 1.0,
@@ -271,7 +283,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             ),
           ),
           Container(
-            decoration: AppTheme.retroPixelBorder(AppTheme.errorColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: ElevatedButton(
               onPressed: () {
                 setState(() {
@@ -296,7 +311,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                         Expanded(
                           child: Text(
                             'All boundaries cleared! You can now place new locations.',
-                            style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                            style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                           ),
                         ),
                       ],
@@ -315,7 +330,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               ),
               child: Text(
                 'CLEAR ALL',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: AppTheme.errorColor,
                   fontSize: 12,
                   letterSpacing: 1.0,
@@ -410,18 +425,18 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         backgroundColor: AppTheme.backgroundColor,
         title: Text(
           title,
-          style: AppTheme.retroSubtitle.copyWith(color: AppTheme.primaryColor),
+          style: AppTheme.modernSubtitle.copyWith(color: AppTheme.primaryColor),
         ),
         content: Text(
           message,
-          style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+          style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(
               'Cancel',
-              style: AppTheme.retroButton.copyWith(color: AppTheme.secondaryColor),
+              style: AppTheme.modernButton.copyWith(color: AppTheme.secondaryColor),
             ),
           ),
           ElevatedButton(
@@ -429,7 +444,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               Navigator.of(context).pop();
               onAction();
             },
-            style: AppTheme.retroPrimaryButton,
+            style: AppTheme.modernPrimaryButton,
             child: Text(actionText),
           ),
         ],
@@ -486,7 +501,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   Expanded(
                     child: Text(
                       'NFT image selected! Size: ${sizeInKB}KB (Optimized for AR)',
-                      style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                      style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                     ),
                   ),
                 ],
@@ -715,10 +730,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Text(
                 'EVENT DETAILS',
-                style: AppTheme.retroTitle.copyWith(
+                style: AppTheme.modernTitle.copyWith(
                   fontSize: 24,
                   color: AppTheme.primaryColor,
                   letterSpacing: 2.0,
@@ -731,11 +749,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             // Retro Event Title
             TextFormField(
               controller: _nameController,
-              decoration: AppTheme.retroInputDecoration(
+              decoration: InputDecoration(
                 labelText: 'EVENT TITLE *',
                 hintText: 'Enter your event title',
+                filled: true,
+                fillColor: AppTheme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
-              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+              style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter event title';
@@ -752,11 +785,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             TextFormField(
               controller: _descriptionController,
               maxLines: 3,
-              decoration: AppTheme.retroInputDecoration(
+              decoration: InputDecoration(
                 labelText: 'EVENT DESCRIPTION *',
                 hintText: 'Describe your event',
+                filled: true,
+                fillColor: AppTheme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
-              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+              style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter event description';
@@ -777,13 +825,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectDate(context, true),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'START DATE',
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.secondaryColor,
                               fontSize: 12,
                             ),
@@ -793,7 +844,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                             _startDate != null
                                 ? DateFormat('MMM dd, yyyy').format(_startDate!)
                                 : 'SELECT DATE',
-                            style: AppTheme.retroBody.copyWith(
+                            style: AppTheme.modernBodySecondary.copyWith(
                               color: AppTheme.textColor,
                               fontSize: 16,
                             ),
@@ -809,13 +860,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectTime(context, true),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'START TIME',
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.accentColor,
                               fontSize: 12,
                             ),
@@ -825,7 +879,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                             _startTime != null
                                 ? _startTime!.format(context)
                                 : 'SELECT TIME',
-                            style: AppTheme.retroBody.copyWith(
+                            style: AppTheme.modernBodySecondary.copyWith(
                               color: AppTheme.textColor,
                               fontSize: 16,
                             ),
@@ -847,13 +901,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectDate(context, false),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'END DATE',
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.secondaryColor,
                               fontSize: 12,
                             ),
@@ -863,7 +920,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                             _endDate != null
                                 ? DateFormat('MMM dd, yyyy').format(_endDate!)
                                 : 'SELECT DATE',
-                            style: AppTheme.retroBody.copyWith(
+                            style: AppTheme.modernBodySecondary.copyWith(
                               color: AppTheme.textColor,
                               fontSize: 16,
                             ),
@@ -879,13 +936,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     onTap: () => _selectTime(context, false),
                     child: Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'END TIME',
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.accentColor,
                               fontSize: 12,
                             ),
@@ -895,7 +955,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                             _endTime != null
                                 ? _endTime!.format(context)
                                 : 'SELECT TIME',
-                            style: AppTheme.retroBody.copyWith(
+                            style: AppTheme.modernBodySecondary.copyWith(
                               color: AppTheme.textColor,
                               fontSize: 16,
                             ),
@@ -912,11 +972,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             // Retro Venue
             TextFormField(
               controller: _venueController,
-              decoration: AppTheme.retroInputDecoration(
+              decoration: InputDecoration(
                 labelText: 'VENUE/LOCATION *',
                 hintText: 'Enter event venue',
+                filled: true,
+                fillColor: AppTheme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
-              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+              style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter venue';
@@ -934,14 +1009,29 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               controller: _nftSupplyController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: AppTheme.retroInputDecoration(
+              decoration: InputDecoration(
                 labelText: 'NFT SUPPLY COUNT *',
                 hintText: 'Enter number of NFTs',
+                filled: true,
+                fillColor: AppTheme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ).copyWith(
                 suffixText: 'NFTs',
                 suffixStyle: TextStyle(color: AppTheme.primaryColor),
               ),
-              style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+              style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter NFT supply count';
@@ -964,7 +1054,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               child: Container(
                 width: double.infinity,
                 height: 120,
-                decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                 child: _nftImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(0), // Pixelated
@@ -984,7 +1077,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                           const SizedBox(height: 8),
                           Text(
                             'ADD NFT IMAGE (REQUIRED)',
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.primaryColor,
                               fontSize: 14,
                             ),
@@ -998,7 +1091,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             Container(
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.all(12),
-              decoration: AppTheme.retroPixelBorder(AppTheme.accentColor.withOpacity(0.3)),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1012,7 +1108,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       const SizedBox(width: 8),
                       Text(
                         'AR-OPTIMIZED IMAGE REQUIREMENTS',
-                        style: AppTheme.retroButton.copyWith(
+                        style: AppTheme.modernButton.copyWith(
                           color: AppTheme.accentColor,
                           fontSize: 12,
                           letterSpacing: 0.5,
@@ -1023,7 +1119,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '• Size: 512x512 pixels (optimal for AR display)\n• Format: JPG/PNG\n• Quality: High (90%)\n• Max file size: ~200KB for best performance',
-                    style: AppTheme.retroBody.copyWith(
+                    style: AppTheme.modernBodySecondary.copyWith(
                       color: AppTheme.textColor.withOpacity(0.8),
                       fontSize: 11,
                       height: 1.3,
@@ -1051,7 +1147,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Icon(
@@ -1062,7 +1161,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'SELECT EVENT AREA',
-                  style: AppTheme.retroTitle.copyWith(
+                  style: AppTheme.modernTitle.copyWith(
                     fontSize: 20,
                     color: AppTheme.primaryColor,
                     letterSpacing: 2.0,
@@ -1072,7 +1171,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Tap on the map to set the center of your event area',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.8),
                     fontSize: 14,
                   ),
@@ -1086,25 +1185,46 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    decoration: AppTheme.retroInputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'SEARCH LOCATION',
                       hintText: 'Enter location name...',
+                      filled: true,
+                      fillColor: AppTheme.cardColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     ).copyWith(
                       prefixIcon: Icon(Icons.search, color: AppTheme.secondaryColor),
                     ),
-                    style: AppTheme.retroBody.copyWith(color: AppTheme.textColor),
+                    style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.textColor),
                     onSubmitted: (_) => _searchLocation(),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: IconButton(
                     onPressed: _getCurrentLocation,
                     icon: Icon(Icons.my_location, color: AppTheme.primaryColor),
@@ -1122,7 +1242,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             height: 300, // Fixed height to prevent overflow
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: ClipRect(
               child: GoogleMap(
                 onMapCreated: _onMapCreated,
@@ -1145,7 +1268,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Row(
@@ -1159,7 +1285,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       'EVENT AREA RADIUS',
-                      style: AppTheme.retroSubtitle.copyWith(
+                      style: AppTheme.modernSubtitle.copyWith(
                         color: AppTheme.primaryColor,
                         fontSize: 18,
                         letterSpacing: 1.5,
@@ -1171,10 +1297,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Text(
                     '${_selectedAreaRadius.round()} METERS',
-                    style: AppTheme.retroTitle.copyWith(
+                    style: AppTheme.modernTitle.copyWith(
                       fontSize: 24,
                       color: AppTheme.secondaryColor,
                       letterSpacing: 2.0,
@@ -1212,7 +1341,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Drag to adjust the radius of your event area',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.7),
                     fontSize: 12,
                   ),
@@ -1239,7 +1368,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 20),
-            decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Icon(
@@ -1250,7 +1382,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'BOUNDARY CONFIGURATION',
-                  style: AppTheme.retroTitle.copyWith(
+                  style: AppTheme.modernTitle.copyWith(
                     fontSize: 20,
                     color: AppTheme.secondaryColor,
                     letterSpacing: 2.0,
@@ -1260,7 +1392,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Configure how users will claim your NFTs',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.8),
                     fontSize: 14,
                   ),
@@ -1274,7 +1406,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 20),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1288,7 +1423,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       'CLAIM RADIUS',
-                      style: AppTheme.retroSubtitle.copyWith(
+                      style: AppTheme.modernSubtitle.copyWith(
                         color: AppTheme.primaryColor,
                         fontSize: 18,
                         letterSpacing: 1.5,
@@ -1300,10 +1435,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Text(
                     '${_boundaryRadius.round()} METERS',
-                    style: AppTheme.retroTitle.copyWith(
+                    style: AppTheme.modernTitle.copyWith(
                       fontSize: 28,
                       color: AppTheme.accentColor,
                       letterSpacing: 2.0,
@@ -1328,10 +1466,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Text(
                     'Users must be within this radius to claim the NFT',
-                    style: AppTheme.retroBody.copyWith(
+                    style: AppTheme.modernBodySecondary.copyWith(
                       color: AppTheme.textColor.withOpacity(0.9),
                       fontSize: 12,
                     ),
@@ -1345,7 +1486,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           // Event Summary Preview
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1359,7 +1503,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       'EVENT SUMMARY',
-                      style: AppTheme.retroSubtitle.copyWith(
+                      style: AppTheme.modernSubtitle.copyWith(
                         color: AppTheme.accentColor,
                         fontSize: 18,
                         letterSpacing: 1.5,
@@ -1398,7 +1542,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Icon(
@@ -1409,7 +1556,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'PLACE BOUNDARY LOCATIONS',
-                  style: AppTheme.retroTitle.copyWith(
+                  style: AppTheme.modernTitle.copyWith(
                     fontSize: 20,
                     color: AppTheme.accentColor,
                     letterSpacing: 2.0,
@@ -1419,7 +1566,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Tap on the map or use current location to place $nftSupplyCount NFT locations',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.8),
                     fontSize: 14,
                   ),
@@ -1433,7 +1580,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Row(
@@ -1447,7 +1597,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       'PLACEMENT PROGRESS',
-                      style: AppTheme.retroSubtitle.copyWith(
+                      style: AppTheme.modernSubtitle.copyWith(
                         color: AppTheme.primaryColor,
                         fontSize: 16,
                         letterSpacing: 1.5,
@@ -1459,10 +1609,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
-                  decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Text(
                     '${_boundaryLocations.length} / $nftSupplyCount',
-                    style: AppTheme.retroTitle.copyWith(
+                    style: AppTheme.modernTitle.copyWith(
                       fontSize: 32,
                       color: AppTheme.secondaryColor,
                       letterSpacing: 2.0,
@@ -1472,7 +1625,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: ClipRect(
                     child: LinearProgressIndicator(
                       value: _boundaryLocations.length / nftSupplyCount,
@@ -1485,7 +1641,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'BOUNDARIES PLACED',
-                  style: AppTheme.retroButton.copyWith(
+                  style: AppTheme.modernButton.copyWith(
                     color: AppTheme.textColor.withOpacity(0.7),
                     fontSize: 10,
                     letterSpacing: 1.5,
@@ -1499,7 +1655,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Column(
               children: [
                 Row(
@@ -1513,7 +1672,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     const SizedBox(width: 8),
                     Text(
                       'PLACEMENT TOOLS',
-                      style: AppTheme.retroSubtitle.copyWith(
+                      style: AppTheme.modernSubtitle.copyWith(
                         color: AppTheme.primaryColor,
                         fontSize: 16,
                         letterSpacing: 1.5,
@@ -1526,14 +1685,17 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   children: [
                     Expanded(
                       child: Container(
-                        decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                        decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                         child: ElevatedButton.icon(
                           onPressed: _addNFTAtCurrentLocation,
                           icon: Icon(Icons.my_location, color: AppTheme.backgroundColor),
                           label: Text(
                             'ADD AT CURRENT LOCATION',
                             textAlign: TextAlign.start,
-                            style: AppTheme.retroButton.copyWith(
+                            style: AppTheme.modernButton.copyWith(
                               color: AppTheme.primaryColor,
 
                               fontSize: 12,
@@ -1551,7 +1713,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     ),
                     const SizedBox(width: 12),
                     Container(
-                      decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                       child: IconButton(
                         onPressed: _getCurrentLocation,
                         icon: Icon(Icons.refresh, color: AppTheme.accentColor),
@@ -1567,13 +1732,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 if (_boundaryLocations.isNotEmpty)
                   Container(
                     width: double.infinity,
-                    decoration: AppTheme.retroPixelBorder(AppTheme.errorColor.withOpacity(0.3)),
+                    decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                     child: ElevatedButton.icon(
                       onPressed: _clearAllBoundaries,
                       icon: Icon(Icons.clear_all, color: AppTheme.primaryColor),
                       label: Text(
                         'CLEAR ALL BOUNDARIES',
-                        style: AppTheme.retroButton.copyWith(
+                        style: AppTheme.modernButton.copyWith(
                           color: AppTheme.primaryColor,
                           fontSize: 12,
                           letterSpacing: 1.0,
@@ -1590,7 +1758,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Use current location or tap on map to place boundaries',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.7),
                     fontSize: 12,
                   ),
@@ -1604,7 +1772,10 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             height: 300, // Fixed height to prevent overflow
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: ClipRect(
               child: GoogleMap(
                 onMapCreated: _onMapCreated,
@@ -1631,12 +1802,18 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: AppTheme.retroPixelBorder(AppTheme.accentColor),
+                  decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                   child: Icon(
                     Icons.info_outline,
                     color: AppTheme.accentColor,
@@ -1650,7 +1827,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                     children: [
                       Text(
                         'PLACEMENT INSTRUCTIONS',
-                        style: AppTheme.retroButton.copyWith(
+                        style: AppTheme.modernButton.copyWith(
                           color: AppTheme.primaryColor,
                           fontSize: 12,
                           letterSpacing: 1.0,
@@ -1659,7 +1836,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Tap on the map or use the "ADD AT CURRENT LOCATION" button to place boundary locations. Each green marker represents one NFT location.',
-                        style: AppTheme.retroBody.copyWith(
+                        style: AppTheme.modernBodySecondary.copyWith(
                           color: AppTheme.textColor.withOpacity(0.9),
                           fontSize: 12,
                         ),
@@ -1677,36 +1854,21 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          Text(
-            value,
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildRetroSummaryRow(String label, String value) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
-      decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.2)),
+      decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label.toUpperCase(),
-            style: AppTheme.retroButton.copyWith(
+            style: AppTheme.modernButton.copyWith(
               color: AppTheme.textColor.withOpacity(0.8),
               fontSize: 12,
               letterSpacing: 1.0,
@@ -1714,7 +1876,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           ),
           Text(
             value,
-            style: AppTheme.retroBody.copyWith(
+            style: AppTheme.modernBodySecondary.copyWith(
               color: AppTheme.textColor,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -1726,7 +1888,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   }
 
   Future<void> _createEvent() async {
-    print('Creating event...');
+    print('🚀 Creating event with smart contract integration...');
     print('Current step: $_currentStep');
     print('Can proceed: ${_canProceedToNextStep()}');
     
@@ -1763,53 +1925,63 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       return;
     }
     
+    // Get wallet connection state
+    final walletState = ref.read(walletConnectionProvider);
+    if (!walletState.isConnected || walletState.walletAddress == null) {
+      _showRetroError('Please connect your wallet to create an event');
+      return;
+    }
+    
     setState(() => _isLoading = true);
     
     try {
-      // Use a demo wallet address since we're not using real wallet
-      final walletAddress = 'demo_wallet_${DateTime.now().millisecondsSinceEpoch}';
+      // Get services
+      final web3Service = ref.read(web3ServiceProvider);
+      final ipfsService = ref.read(ipfsServiceProvider);
+      final supabaseService = SupabaseService();
       
-      // First, upload the NFT image to Supabase storage
-      String? uploadedImageUrl;
+      // Step 1: Upload NFT image to IPFS
+      String ipfsImageUrl = 'default_nft_image';
       if (_nftImagePath != null) {
         try {
-          print('Uploading NFT image to Supabase storage...');
-          final supabaseService = SupabaseService();
-          final fileName = 'nft_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          uploadedImageUrl = await supabaseService.uploadImage(_nftImagePath!, fileName);
-          print('Image uploaded successfully: $uploadedImageUrl');
+          print('📤 Uploading NFT image to IPFS...');
+          ipfsImageUrl = await ipfsService.uploadFile(_nftImagePath!);
+          print('✅ Image uploaded to IPFS: $ipfsImageUrl');
         } catch (e) {
-          print('Error uploading image: $e');
-          _showRetroError('Failed to upload image. Please try again.');
-          setState(() => _isLoading = false);
-          return;
+          print('❌ Error uploading image to IPFS: $e');
+          // Fallback to Supabase if IPFS fails
+          print('📤 Falling back to Supabase storage...');
+          final fileName = 'nft_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          ipfsImageUrl = await supabaseService.uploadImage(_nftImagePath!, fileName);
+          print('✅ Image uploaded to Supabase: $ipfsImageUrl');
         }
       }
       
-      // Create boundaries from placed locations
+      // Step 2: Create boundaries metadata
       final boundaries = _boundaryLocations.asMap().entries.map((entry) {
         final index = entry.key;
         final location = entry.value;
         
-        return Boundary(
-          name: 'Boundary ${index + 1}',
-          description: 'NFT Boundary ${index + 1}',
-          imageUrl: uploadedImageUrl ?? 'default_nft_image',
-          latitude: location.latitude,
-          longitude: location.longitude,
-          radius: _boundaryRadius,
-          eventId: '', // Will be set when event is created
-        );
+        return {
+          'name': 'Boundary ${index + 1}',
+          'description': 'NFT Boundary ${index + 1}',
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'radius': _boundaryRadius,
+          'image': ipfsImageUrl,
+        };
       }).toList();
       
-      // Create event
-      final event = Event(
+      // Step 3: Create event metadata for IPFS
+      final eventMetadata = ipfsService.createEventMetadata(
         name: _nameController.text,
         description: _descriptionController.text,
-        organizerWalletAddress: walletAddress,
+        organizer: walletState.walletAddress!,
         latitude: _selectedAreaCenter?.latitude ?? _center.latitude,
         longitude: _selectedAreaCenter?.longitude ?? _center.longitude,
-        venueName: _venueController.text,
+        venue: _venueController.text,
+        nftSupplyCount: nftSupplyCount,
+        imageUrl: ipfsImageUrl,
         boundaries: boundaries,
         startDate: _startDate != null && _startTime != null
             ? DateTime(
@@ -1829,22 +2001,128 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 _endTime!.minute,
               )
             : null,
-        nftSupplyCount: nftSupplyCount,
-        eventImageUrl: uploadedImageUrl,
       );
       
-      // Save event to Supabase only (no blockchain)
-      print('Saving event to database...');
-      final supabaseService = SupabaseService();
-      final createdEvent = await supabaseService.createEvent(event);
+      // Step 4: Upload event metadata to IPFS
+      String ipfsMetadataUrl;
+      try {
+        print('📤 Uploading event metadata to IPFS...');
+        ipfsMetadataUrl = await ipfsService.uploadMetadata(eventMetadata);
+        print('✅ Metadata uploaded to IPFS: $ipfsMetadataUrl');
+      } catch (e) {
+        print('❌ Error uploading metadata to IPFS: $e');
+        // Use a fallback URL or create a local reference
+        ipfsMetadataUrl = 'metadata_${DateTime.now().millisecondsSinceEpoch}';
+      }
       
-      print('Event created successfully with ID: ${createdEvent.id}');
+      // Step 5: Create event on blockchain
+      print('⛓️ Creating event on blockchain...');
+      final reownAppKit = ref.read(reownAppKitProvider);
+      if (reownAppKit == null) {
+        throw Exception('Wallet not connected');
+      }
       
-      if (mounted) {
-        _showEventCreatedDialog(createdEvent);
+      final txHash = await web3Service.createEvent(
+        eventName: _nameController.text,
+        eventDescription: _descriptionController.text,
+        organizerWallet: walletState.walletAddress!,
+        latitude: ((_selectedAreaCenter?.latitude ?? _center.latitude) * 1000000).round(), // Convert to integer
+        longitude: ((_selectedAreaCenter?.longitude ?? _center.longitude) * 1000000).round(), // Convert to integer
+        venueName: _venueController.text,
+        nftSupplyCount: nftSupplyCount,
+        eventImageUrl: ipfsMetadataUrl,
+        signTransaction: (to, data) async {
+          // Use ReownAppKit to sign and send the transaction
+          final result = await reownAppKit.request(
+            topic: walletState.sessionTopic!,
+            chainId: 'eip155:421614', // Arbitrum Sepolia
+            request: SessionRequestParams(
+              method: 'eth_sendTransaction',
+              params: [
+                {
+                  'to': to,
+                  'data': data[0],
+                  'from': walletState.walletAddress,
+                  'gas': '0x${(200000).toRadixString(16)}', // Gas limit
+                  'gasPrice': '0x${(1000000000).toRadixString(16)}', // 1 gwei
+                }
+              ],
+            ),
+          );
+          
+          if (result is String) {
+            return result;
+          } else {
+            throw Exception('Transaction failed: $result');
+          }
+        },
+      );
+      
+      print('✅ Event creation transaction sent: $txHash');
+      
+      // Step 6: Wait for transaction confirmation
+      print('⏳ Waiting for transaction confirmation...');
+      final receipt = await web3Service.waitForTransactionConfirmation(txHash);
+      
+      if (receipt != null && receipt.status == true) {
+        print('✅ Event created successfully on blockchain!');
+        
+        // Step 7: Create local event record for Supabase
+        final localEvent = models.Event(
+          name: _nameController.text,
+          description: _descriptionController.text,
+          organizerWalletAddress: walletState.walletAddress!,
+          latitude: _selectedAreaCenter?.latitude ?? _center.latitude,
+          longitude: _selectedAreaCenter?.longitude ?? _center.longitude,
+          venueName: _venueController.text,
+          boundaries: _boundaryLocations.asMap().entries.map((entry) {
+            final index = entry.key;
+            final location = entry.value;
+            
+            return Boundary(
+              name: 'Boundary ${index + 1}',
+              description: 'NFT Boundary ${index + 1}',
+              imageUrl: ipfsImageUrl,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              radius: _boundaryRadius,
+              eventId: '', // Will be set when event is created
+            );
+          }).toList(),
+          startDate: _startDate != null && _startTime != null
+              ? DateTime(
+                  _startDate!.year,
+                  _startDate!.month,
+                  _startDate!.day,
+                  _startTime!.hour,
+                  _startTime!.minute,
+                )
+              : null,
+          endDate: _endDate != null && _endTime != null
+              ? DateTime(
+                  _endDate!.year,
+                  _endDate!.month,
+                  _endDate!.day,
+                  _endTime!.hour,
+                  _endTime!.minute,
+                )
+              : null,
+          nftSupplyCount: nftSupplyCount,
+          eventImageUrl: ipfsImageUrl,
+        );
+        
+        // Save to Supabase for local reference
+        final createdEvent = await supabaseService.createEvent(localEvent);
+        print('✅ Local event record created with ID: ${createdEvent.id}');
+        
+        if (mounted) {
+          _showEventCreatedDialog(createdEvent, txHash: txHash);
+        }
+      } else {
+        throw Exception('Transaction failed or was reverted');
       }
     } catch (e) {
-      print('Error creating event: $e');
+      print('❌ Error creating event: $e');
       if (mounted) {
         _showRetroError('Error creating event: $e');
       }
@@ -1867,7 +2145,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             Expanded(
               child: Text(
                 message,
-                style: AppTheme.retroBody.copyWith(color: AppTheme.backgroundColor),
+                style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
               ),
             ),
           ],
@@ -1879,7 +2157,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     );
   }
 
-  void _showEventCreatedDialog(Event event) {
+  void _showEventCreatedDialog(models.Event event, {String? txHash}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1900,7 +2178,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               const SizedBox(height: 16),
               Text(
                 'EVENT CREATED!',
-                style: AppTheme.retroTitle.copyWith(
+                style: AppTheme.modernTitle.copyWith(
                   fontSize: 20,
                   color: AppTheme.primaryColor,
                   letterSpacing: 1.5,
@@ -1912,7 +2190,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               // Event Code
               Text(
                 'YOUR EVENT CODE',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: AppTheme.secondaryColor,
                   fontSize: 14,
                   letterSpacing: 1.5,
@@ -1923,13 +2201,16 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               // Event Code Display
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       event.eventCode,
-                      style: AppTheme.retroTitle.copyWith(
+                      style: AppTheme.modernTitle.copyWith(
                         fontSize: 16,
                         color: AppTheme.primaryColor,
                         letterSpacing: 2.0,
@@ -1961,23 +2242,84 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               
               const SizedBox(height: 16),
               
-              // Local Event Notice
+              // Transaction Hash (if available)
+              if (txHash != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'BLOCKCHAIN TRANSACTION',
+                  style: AppTheme.modernButton.copyWith(
+                    color: AppTheme.secondaryColor,
+                    fontSize: 14,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          txHash,
+                          style: AppTheme.modernBodySecondary.copyWith(
+                            color: AppTheme.textColor,
+                            fontSize: 10,
+                            fontFamily: 'Courier',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: txHash));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Transaction hash copied!'),
+                              backgroundColor: AppTheme.successColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                            ),
+                          );
+                        },
+                        icon: Icon(Icons.copy, color: AppTheme.accentColor, size: 16),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppTheme.backgroundColor,
+                          padding: const EdgeInsets.all(4),
+                          minimumSize: const Size(32, 32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 16),
+              
+              // Success Notice
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: AppTheme.retroPixelBorder(AppTheme.accentColor.withOpacity(0.3)),
+                decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                 child: Row(
                   children: [
                     Icon(
-                      Icons.info_outline,
-                      color: AppTheme.accentColor,
+                      Icons.check_circle,
+                      color: AppTheme.successColor,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Event created successfully!',
-                        style: AppTheme.retroBody.copyWith(
-                          color: AppTheme.accentColor,
+                        txHash != null 
+                            ? 'Event created on blockchain successfully!'
+                            : 'Event created successfully!',
+                        style: AppTheme.modernBodySecondary.copyWith(
+                          color: AppTheme.successColor,
                           fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
@@ -2004,7 +2346,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   ),
                   child: Text(
                     'JOIN EVENT',
-                    style: AppTheme.retroButton.copyWith(
+                    style: AppTheme.modernButton.copyWith(
                       color: AppTheme.backgroundColor,
                       fontSize: 14,
                       letterSpacing: 1.0,
@@ -2045,176 +2387,107 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     }
   }
 
-
-
-  Future<void> _testCreateMinimalEvent() async {
+  Future<void> _testWeb3Connection() async {
     try {
-      final supabaseService = SupabaseService();
+      print('🧪 Testing Web3 connection...');
       
-      // Test the minimal event creation method
-      final success = await supabaseService.testMinimalEventCreation();
+      // Run comprehensive Web3 integration tests
+      await TestWeb3Integration.runTests(ref);
+      TestWeb3Integration.printTestResults();
       
-      if (success) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Test event creation successful! Database connection working.'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      } else {
-        // Show a more detailed error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Test failed. Check console for details.'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 10),
-            action: SnackBarAction(
-              label: 'Show Details',
-              textColor: Colors.white,
-              onPressed: () {
-                _showDebugInfo();
-              },
+            content: Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: AppTheme.backgroundColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Web3 integration test completed successfully! Check console for details.',
+                    style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
+                  ),
+                ),
+              ],
             ),
+            backgroundColor: AppTheme.successColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Test event creation failed: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 10),
-        ),
-      );
+      print('❌ Web3 connection test failed: $e');
+      if (mounted) {
+        _showRetroError('Web3 connection test failed: $e');
+      }
     }
   }
 
-  void _showDebugInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Debug Information'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Error: Test event creation failed'),
-            SizedBox(height: 8),
-            Text('Please check:'),
-            Text('1. Console output for detailed logs'),
-            Text('2. Supabase project configuration'),
-            Text('3. RLS policies and permissions'),
-            Text('4. API keys and project URL'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showAuthErrorDetails({String? error}) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Anonymous Authentication Failed'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (error != null) ...[
-              Text('Error Details:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Container(
-                padding: EdgeInsets.all(8),
-                margin: EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(error, style: TextStyle(fontSize: 12, fontFamily: 'monospace')),
-              ),
-              SizedBox(height: 8),
-            ],
-            Text('Common Solutions:', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('1. Enable Anonymous Signups in Supabase:'),
-            Text('   • Go to Supabase Dashboard'),
-            Text('   • Authentication > Settings'),
-            Text('   • Turn ON "Enable anonymous signups"'),
-            SizedBox(height: 8),
-            Text('2. Check API Keys:'),
-            Text('   • Verify URL and anon key in main.dart'),
-            Text('   • Ensure project is active'),
-            SizedBox(height: 8),
-            Text('3. Check Project Status:'),
-            Text('   • Ensure project is not paused'),
-            Text('   • Check if there are any restrictions'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+
+
+
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'Create Event (Step ${_currentStep + 1}/$_totalSteps)',
-          style: AppTheme.retroSubtitle.copyWith(
-            fontSize: 15,
-            color: AppTheme.primaryColor,
-            shadows: [
-              Shadow(
-                offset: const Offset(2, 2),
-                blurRadius: 0,
-                color: AppTheme.primaryColor.withOpacity(0.5),
+    // Restore wallet state when the page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(globalWalletServiceProvider).restoreWalletState();
+    });
+
+    return WalletConnectionWrapper(
+      requireWallet: true,
+      redirectRoute: '/wallet/connect',
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Create Event (Step ${_currentStep + 1}/$_totalSteps)',
+                  style: AppTheme.modernSubtitle.copyWith(
+                    fontSize: 15,
+                    color: AppTheme.textColor,
+                  ),
+                ),
+              ),
+              // Wallet connection status
+              WalletConnectionStatus(
+                showAddress: true,
+                showDisconnectButton: false,
               ),
             ],
           ),
-        ),
-        
-                leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
-          child: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppTheme.primaryColor),
-            onPressed: () => context.go('/wallet/options'),
+          leading: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: AppTheme.modernContainerDecoration,
+            child: IconButton(
+              icon: Icon(Icons.arrow_back_rounded, color: AppTheme.primaryColor),
+              onPressed: () => context.go('/wallet/options'),
+            ),
           ),
         ),
-      ),
       body: Column(
         children: [
-          // Retro Progress indicator
+          // Modern Progress indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(0), // Pixelated
-              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5), width: 1),
-            ),
+            decoration: AppTheme.modernContainerDecoration,
             child: Column(
               children: [
                 Text(
-                  'PROGRESS',
-                  style: AppTheme.retroButton.copyWith(
+                  'Progress',
+                  style: AppTheme.modernButton.copyWith(
                     fontSize: 12,
                     color: AppTheme.primaryColor,
-                    letterSpacing: 1.5,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2222,24 +2495,18 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   children: List.generate(_totalSteps, (index) {
                     return Expanded(
                       child: Container(
-                        height: 8,
+                        height: 4,
                         margin: EdgeInsets.only(right: index < _totalSteps - 1 ? 8 : 0),
                         decoration: BoxDecoration(
                           color: index <= _currentStep 
                               ? AppTheme.primaryColor 
-                              : AppTheme.surfaceColor.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(0), // Pixelated
-                          border: Border.all(
-                            color: index <= _currentStep 
-                                ? AppTheme.primaryColor 
-                                : AppTheme.primaryColor.withOpacity(0.3),
-                            width: 1,
-                          ),
+                              : AppTheme.cardColor,
+                          borderRadius: BorderRadius.circular(2),
                           boxShadow: index <= _currentStep ? [
                             BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.6),
-                              offset: const Offset(2, 2),
-                              blurRadius: 0,
+                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              offset: const Offset(0, 2),
+                              blurRadius: 4,
                             ),
                           ] : null,
                         ),
@@ -2279,9 +2546,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                       if (_currentStep == _totalSteps - 1)
                         Column(
                           children: [
-
-                           
-                            
+                            // Test Web3 Connection Button
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ElevatedButton(
+                                onPressed: _testWeb3Connection,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.accentColor,
+                                  foregroundColor: AppTheme.backgroundColor,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                ),
+                                child: Text(
+                                  'Test Web3 Connection',
+                                  style: AppTheme.modernButton.copyWith(
+                                    color: AppTheme.backgroundColor,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                     ],
@@ -2290,87 +2574,63 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                   children: [
                     if (_currentStep > 0)
                       Expanded(
-                        child: Container(
-                          decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
-                          child: OutlinedButton(
-                            onPressed: _previousStep,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: BorderSide.none,
-                              backgroundColor: AppTheme.surfaceColor.withOpacity(0.3),
-                            ),
-                            child: Text(
-                              'PREVIOUS',
-                              style: AppTheme.retroButton.copyWith(
-                                color: AppTheme.secondaryColor,
-                                fontSize: 14,
-                                letterSpacing: 1.0,
-                              ),
+                        child: OutlinedButton(
+                          onPressed: _previousStep,
+                          style: AppTheme.modernOutlinedButton,
+                          child: Text(
+                            'Previous',
+                            style: AppTheme.modernButton.copyWith(
+                              fontSize: 14,
                             ),
                           ),
                         ),
                       ),
                     if (_currentStep > 0) const SizedBox(width: 16),
                     Expanded(
-                      child: Container(
-                        decoration: _canProceedToNextStep() 
-                            ? AppTheme.retroAnimatedContainer(
-                                color: AppTheme.primaryColor,
-                                isGlowing: true,
-                              )
-                            : AppTheme.retroPixelBorder(Colors.grey),
-                        child: ElevatedButton(
-                          onPressed: _canProceedToNextStep() 
-                              ? (_currentStep == _totalSteps - 1 ? () {
-                                  print('Create Event button pressed!');
-                                  print('Current step: $_currentStep');
-                                  print('Can proceed: ${_canProceedToNextStep()}');
-                                  _createEvent();
-                                } : _nextStep)
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(0), // Pixelated
-                            ),
+                      child: ElevatedButton(
+                        onPressed: _canProceedToNextStep() 
+                            ? (_currentStep == _totalSteps - 1 ? () {
+                                print('Create Event button pressed!');
+                                print('Current step: $_currentStep');
+                                print('Can proceed: ${_canProceedToNextStep()}');
+                                _createEvent();
+                              } : _nextStep)
+                            : null,
+                        style: AppTheme.modernPrimaryButton.copyWith(
+                          backgroundColor: MaterialStateProperty.all(
+                            _canProceedToNextStep() ? AppTheme.primaryColor : AppTheme.cardColor,
                           ),
-                          child: _isLoading
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _currentStep == _totalSteps - 1 ? 'CREATE EVENT' : 'NEXT',
-                                      style: AppTheme.retroButton.copyWith(
-                                        color: AppTheme.backgroundColor,
-                                        fontSize: 14,
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                    if (!_canProceedToNextStep()) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _getValidationMessage(),
-                                        style: TextStyle(
-                                          color: AppTheme.backgroundColor.withOpacity(0.7),
-                                          fontSize: 10,
-                                          fontFamily: 'Courier',
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ],
-                                ),
                         ),
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textColor),
+                                ),
+                              )
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _currentStep == _totalSteps - 1 ? 'Create Event' : 'Next',
+                                    style: AppTheme.modernButton.copyWith(
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  if (!_canProceedToNextStep()) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _getValidationMessage(),
+                                      style: AppTheme.modernCaption.copyWith(
+                                        fontSize: 10,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ],
+                              ),
                       ),
                     )
                     ],
@@ -2379,6 +2639,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

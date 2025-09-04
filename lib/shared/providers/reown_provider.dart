@@ -2,24 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reown_appkit/reown_appkit.dart';
 
-// Global ReownAppKit instance provider
+// Global ReownAppKit instance provider - using keepAlive to prevent disposal
 final reownAppKitProvider = StateNotifierProvider<ReownAppKitNotifier, ReownAppKitModal?>((ref) {
+  ref.keepAlive(); // Keep the provider alive across page navigation
   return ReownAppKitNotifier();
 });
 
-// Provider for wallet connection state
+// Provider for wallet connection state - using keepAlive to prevent disposal
 final walletConnectionProvider = StateNotifierProvider<WalletConnectionNotifier, WalletConnectionState>((ref) {
+  ref.keepAlive(); // Keep the provider alive across page navigation
   return WalletConnectionNotifier(ref.read(reownAppKitProvider.notifier));
 });
 
 // State notifier for ReownAppKit
 class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
   ReownAppKitNotifier() : super(null);
+  bool _isInitialized = false;
 
   Future<void> initialize(BuildContext context) async {
-    if (state != null) return; // Already initialized
+    if (_isInitialized && state != null) {
+      debugPrint('ReownAppKit already initialized, skipping...');
+      return; // Already initialized
+    }
 
     try {
+      debugPrint('Initializing ReownAppKit...');
+      
+      // Dispose existing instance if any
+      if (state != null) {
+        debugPrint('Disposing existing ReownAppKit instance...');
+        try {
+          state?.dispose();
+        } catch (e) {
+          debugPrint('Error disposing existing instance: $e');
+        }
+        state = null;
+      }
+
       final appKitModal = ReownAppKitModal(
         context: context,
         projectId: '3b63c12d82703e4367c241580f9ccc06',
@@ -31,7 +50,7 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
         ),
         requiredNamespaces: {
           'eip155': RequiredNamespace(
-            chains: ['eip155:43113', 'eip155:43114'], // Avalanche Fuji + Mainnet
+            chains: ['eip155:421614', 'eip155:43113', 'eip155:43114'], // Arbitrum Sepolia + Avalanche Fuji + Mainnet
             methods: [
               'eth_sendTransaction',
               'eth_signTransaction',
@@ -59,11 +78,16 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
 
       await appKitModal.init();
       state = appKitModal;
+      _isInitialized = true;
       
       // Set up listeners after initialization
       _setupListeners(appKitModal);
+      
+      debugPrint('ReownAppKit initialized successfully');
     } catch (e) {
       debugPrint('Error initializing ReownAppKit: $e');
+      _isInitialized = false;
+      state = null;
       rethrow;
     }
   }
@@ -71,13 +95,43 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
   void _setupListeners(ReownAppKitModal appKitModal) {
     // Listen for session updates
     appKitModal.addListener(() {
-      debugPrint('ReownAppKit session updated - Connected: ${appKitModal.isConnected}');
+      try {
+        debugPrint('ReownAppKit session updated - Connected: ${appKitModal.isConnected}');
+        // Update the state to trigger listeners
+        state = appKitModal;
+      } catch (e) {
+        debugPrint('Error in ReownAppKit listener: $e');
+        // Don't rethrow to prevent crashes
+      }
     });
   }
 
+  @override
   void dispose() {
-    state?.dispose();
+    debugPrint('Disposing ReownAppKitNotifier...');
+    if (state != null) {
+      try {
+        state?.dispose();
+      } catch (e) {
+        debugPrint('Error disposing ReownAppKitModal: $e');
+      }
+      state = null;
+    }
+    _isInitialized = false;
+    super.dispose();
+  }
+
+  // Method to check if ReownAppKit is ready to use
+  bool isReady() {
+    return _isInitialized && state != null;
+  }
+
+  // Method to force reinitialize (useful for recovery)
+  Future<void> forceReinitialize(BuildContext context) async {
+    debugPrint('Force reinitializing ReownAppKit...');
+    _isInitialized = false;
     state = null;
+    await initialize(context);
   }
 }
 
@@ -92,11 +146,16 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
   void _setupListeners() {
     // Listen to ReownAppKit changes
     _reownNotifier.addListener((ReownAppKitModal? appKitModal) {
-      _updateConnectionState();
+      try {
+        _updateConnectionState();
+      } catch (e) {
+        debugPrint('Error in wallet connection listener: $e');
+        // Don't rethrow to prevent crashes
+      }
     });
   }
 
-  void _updateConnectionState() {
+  void _updateConnectionState() async {
     final appKitModal = _reownNotifier.state;
     if (appKitModal == null) {
       state = WalletConnectionState();
@@ -107,8 +166,33 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
     final session = appKitModal.session;
     
     if (isConnected && session != null) {
-      final walletAddress = session.peer?.metadata?.name ?? 'Unknown Wallet';
-      final chainId = appKitModal.selectedChain?.chainId ?? '43113';
+      // Get the actual wallet address from the session
+      String walletAddress = 'Unknown Wallet';
+      
+      // Try to get the wallet address by making a request to get accounts
+      try {
+        final result = await appKitModal.request(
+          topic: session.topic!,
+          chainId: 'eip155:${appKitModal.selectedChain?.chainId ?? '421614'}',
+          request: SessionRequestParams(
+            method: 'eth_accounts',
+            params: [],
+          ),
+        );
+        
+        if (result != null && result is List && result.isNotEmpty) {
+          walletAddress = result.first.toString();
+          debugPrint('Found wallet address from eth_accounts: $walletAddress');
+        } else {
+          debugPrint('No accounts returned from eth_accounts, using fallback');
+          walletAddress = '0x${session.topic!.substring(0, 40)}';
+        }
+      } catch (e) {
+        debugPrint('Error getting wallet address: $e, using fallback');
+        walletAddress = '0x${session.topic!.substring(0, 40)}';
+      }
+      
+      final chainId = appKitModal.selectedChain?.chainId ?? '421614'; // Default to Arbitrum Sepolia
       
       state = WalletConnectionState(
         isConnected: true,
@@ -118,6 +202,8 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
       );
       
       debugPrint('Wallet connected: $walletAddress on chain $chainId');
+      debugPrint('Session topic: ${session.topic}');
+      debugPrint('Selected chain: ${appKitModal.selectedChain?.chainId}');
     } else {
       state = WalletConnectionState(
         isConnected: false,
@@ -192,6 +278,37 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
   // Get the current ReownAppKit instance
   ReownAppKitModal? getAppKitModal() {
     return _reownNotifier.state;
+  }
+
+  // Force refresh the connection state
+  void refreshConnectionState() {
+    debugPrint('Force refreshing wallet connection state...');
+    _updateConnectionState();
+  }
+
+  // Method to restore wallet connection state from storage
+  Future<void> restoreWalletState() async {
+    debugPrint('Attempting to restore wallet connection state...');
+    
+    // Check if ReownAppKit is ready
+    if (!_reownNotifier.isReady()) {
+      debugPrint('ReownAppKit not ready, cannot restore state');
+      return;
+    }
+
+    final appKitModal = _reownNotifier.state;
+    if (appKitModal == null) {
+      debugPrint('AppKitModal is null, cannot restore state');
+      return;
+    }
+
+    // Check if there's an existing session
+    if (appKitModal.isConnected && appKitModal.session != null) {
+      debugPrint('Found existing wallet session, restoring state...');
+      _updateConnectionState();
+    } else {
+      debugPrint('No existing wallet session found');
+    }
   }
 }
 

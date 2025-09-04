@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/reown_provider.dart';
+import '../services/global_wallet_service.dart';
 import '../../core/theme/app_theme.dart';
 
 /// A wrapper widget that ensures wallet connection is properly maintained
@@ -33,15 +35,13 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
   }
 
   void _checkWalletStatus() {
-    final walletState = ref.read(walletConnectionProvider);
-    final walletNotifier = ref.read(walletConnectionProvider.notifier);
+    final globalWalletService = ref.read(globalWalletServiceProvider);
     
     debugPrint('WalletConnectionWrapper: Checking wallet status');
-    debugPrint('WalletConnectionWrapper: isConnected: ${walletState.isConnected}');
-    debugPrint('WalletConnectionWrapper: isWalletReady: ${walletNotifier.isWalletReady()}');
+    debugPrint('WalletConnectionWrapper: isConnected: ${globalWalletService.isWalletConnected()}');
     
     // If wallet is required but not connected, show connection prompt
-    if (widget.requireWallet && !walletNotifier.isWalletReady()) {
+    if (widget.requireWallet && !globalWalletService.isWalletConnected()) {
       _showWalletConnectionPrompt();
     }
   }
@@ -56,7 +56,10 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
         title: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+          decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -68,7 +71,7 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
               const SizedBox(width: 8),
               Text(
                 'WALLET REQUIRED',
-                style: AppTheme.retroSubtitle.copyWith(
+                style: AppTheme.modernSubtitle.copyWith(
                   color: AppTheme.primaryColor,
                   fontSize: 16,
                   letterSpacing: 1.5,
@@ -82,7 +85,7 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
           children: [
             Text(
               'This feature requires a connected wallet to interact with the blockchain.',
-              style: AppTheme.retroBody.copyWith(
+              style: AppTheme.modernBodySecondary.copyWith(
                 color: AppTheme.textColor,
                 fontSize: 14,
               ),
@@ -91,10 +94,13 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Text(
                 'Please connect your wallet to continue.',
-                style: AppTheme.retroBody.copyWith(
+                style: AppTheme.modernBodySecondary.copyWith(
                   color: AppTheme.secondaryColor,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -106,17 +112,20 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
         ),
         actions: [
           Container(
-            decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 if (widget.redirectRoute != null) {
-                  Navigator.of(context).pushReplacementNamed(widget.redirectRoute!);
+                  context.go(widget.redirectRoute!);
                 }
               },
               child: Text(
                 'CANCEL',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: AppTheme.textColor.withOpacity(0.8),
                   fontSize: 12,
                   letterSpacing: 1.0,
@@ -125,21 +134,47 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
             ),
           ),
           Container(
-            decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             child: ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop();
                 try {
+                  final globalWalletService = ref.read(globalWalletServiceProvider);
+                  
+                  // Ensure ReownAppKit is initialized
+                  await globalWalletService.ensureReownAppKitInitialized(context);
+                  
+                  // Connect wallet
                   await ref.read(walletConnectionProvider.notifier).connect();
+                  
+                  // Refresh wallet state
+                  globalWalletService.refreshWalletState();
+                  
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to connect wallet: $e'),
-                        backgroundColor: AppTheme.errorColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-                      ),
-                    );
+                  if (mounted && context.mounted) {
+                    try {
+                      String errorMessage = 'Failed to connect wallet';
+                      if (e.toString().contains('disposed') || 
+                          e.toString().contains('interrupted') || 
+                          e.toString().contains('ReownAppKitModalException')) {
+                        errorMessage = 'Wallet connection was interrupted. Please try again.';
+                      } else {
+                        errorMessage = 'Failed to connect wallet: $e';
+                      }
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(errorMessage),
+                          backgroundColor: AppTheme.errorColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                        ),
+                      );
+                    } catch (snackBarError) {
+                      debugPrint('Error showing snackbar: $snackBarError');
+                    }
                   }
                 }
               },
@@ -151,7 +186,7 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
               ),
               child: Text(
                 'CONNECT WALLET',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: AppTheme.primaryColor,
                   fontSize: 12,
                   letterSpacing: 1.0,
@@ -202,9 +237,10 @@ class WalletConnectionStatus extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: AppTheme.retroPixelBorder(
-        walletState.isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.3)
-      ),
+      decoration: BoxDecoration(
+                border: Border.all(color: walletState.isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -222,7 +258,7 @@ class WalletConnectionStatus extends ConsumerWidget {
             children: [
               Text(
                 walletState.isConnected ? 'WALLET CONNECTED' : 'NO WALLET',
-                style: AppTheme.retroButton.copyWith(
+                style: AppTheme.modernButton.copyWith(
                   color: walletState.isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.7),
                   fontSize: 10,
                   letterSpacing: 1.0,
@@ -232,7 +268,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${walletState.walletAddress!.substring(0, 6)}...${walletState.walletAddress!.substring(walletState.walletAddress!.length - 4)}',
-                  style: AppTheme.retroBody.copyWith(
+                  style: AppTheme.modernBodySecondary.copyWith(
                     color: AppTheme.textColor.withOpacity(0.8),
                     fontSize: 10,
                     fontFamily: 'Courier',
@@ -249,19 +285,26 @@ class WalletConnectionStatus extends ConsumerWidget {
                   await walletNotifier.disconnect();
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error disconnecting wallet: $e'),
-                        backgroundColor: AppTheme.errorColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-                      ),
-                    );
+                    try {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error disconnecting wallet: $e'),
+                          backgroundColor: AppTheme.errorColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                        ),
+                      );
+                    } catch (snackBarError) {
+                      debugPrint('Error showing disconnect error snackbar: $snackBarError');
+                    }
                   }
                 }
               },
               child: Container(
                 padding: const EdgeInsets.all(4),
-                decoration: AppTheme.retroPixelBorder(AppTheme.textColor.withOpacity(0.3)),
+                decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                 child: Icon(
                   Icons.logout,
                   color: AppTheme.textColor.withOpacity(0.7),

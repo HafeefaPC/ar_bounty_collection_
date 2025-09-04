@@ -74,7 +74,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
         elevation: 0,
         title: Text(
           'MY BOUNDARY COLLECTION',
-          style: AppTheme.retroSubtitle.copyWith(
+          style: AppTheme.modernSubtitle.copyWith(
             fontSize: 18,
             color: AppTheme.primaryColor,
             letterSpacing: 1.5,
@@ -89,7 +89,10 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
         ),
                 leading: Container(
           margin: const EdgeInsets.all(8),
-          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+          decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
           child: IconButton(
             icon: Icon(Icons.arrow_back, color: AppTheme.primaryColor),
             onPressed: () => context.go('/wallet/options'),
@@ -115,7 +118,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                 // Retro Header Stats
                 Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: AppTheme.retroCardDecoration.copyWith(
+                  decoration: AppTheme.modernCardDecoration.copyWith(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -129,7 +132,10 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+                        decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                         child: Icon(
                           Icons.celebration,
                           size: 48,
@@ -139,7 +145,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                       const SizedBox(height: 16),
                       Text(
                         '${userClaims.length}',
-                        style: AppTheme.retroTitle.copyWith(
+                        style: AppTheme.modernTitle.copyWith(
                           fontSize: 32,
                           color: AppTheme.primaryColor,
                           shadows: [
@@ -153,10 +159,13 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: AppTheme.retroPixelBorder(AppTheme.secondaryColor),
+                        decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.secondaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
                         child: Text(
                           'BOUNDARIES COLLECTED',
-                          style: AppTheme.retroButton.copyWith(
+                          style: AppTheme.modernButton.copyWith(
                             fontSize: 14,
                             color: AppTheme.secondaryColor,
                             letterSpacing: 1.0,
@@ -285,7 +294,7 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.retroCardDecoration.copyWith(
+      decoration: AppTheme.modernCardDecoration.copyWith(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -300,7 +309,10 @@ class _BoundaryHistoryScreenState extends ConsumerState<BoundaryHistoryScreen> {
         leading: Container(
           width: 50,
           height: 50,
-          decoration: AppTheme.retroPixelBorder(AppTheme.primaryColor),
+          decoration: BoxDecoration(
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12),
+              ),
           child: Icon(
             Icons.check_circle,
             color: AppTheme.primaryColor,

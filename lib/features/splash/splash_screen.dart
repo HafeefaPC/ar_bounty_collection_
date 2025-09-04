@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:face_reflector/core/theme/app_theme.dart';
+import 'package:face_reflector/shared/providers/reown_provider.dart';
 import '../../shared/widgets/tokon_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -54,7 +55,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     
     await Future.delayed(const Duration(milliseconds: 2000));
     if (mounted) {
-      context.go('/wallet/connect');
+      // Check wallet connection status and navigate accordingly
+      final walletState = ref.read(walletConnectionProvider);
+      if (walletState.isConnected) {
+        context.go('/wallet/options');
+      } else {
+        context.go('/wallet/connect');
+      }
     }
   }
 
@@ -76,17 +83,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppTheme.darkGradient,
-        ),
+        decoration: AppTheme.modernScaffoldBackground,
         child: Stack(
           children: [
-            // Retro Scanlines Effect
+            // Modern Background Pattern
             AnimatedBuilder(
               animation: _scanlineController,
               builder: (context, child) {
                 return CustomPaint(
-                  painter: RetroScanlinesPainter(
+                  painter: ModernBackgroundPainter(
                     progress: _scanlineController.value,
                   ),
                   size: Size.infinite,
@@ -99,32 +104,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Decorative top border
+                    // Modern decorative element
                     Container(
-                      width: screenWidth * 0.6,
-                      height: 4,
+                      width: screenWidth * 0.4,
+                      height: 2,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.3),
-                            AppTheme.primaryColor,
-                            AppTheme.primaryColor.withOpacity(0.3),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.5),
-                            offset: const Offset(0, 2),
-                            blurRadius: 0,
-                          ),
-                        ],
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(1),
                       ),
                     ),
                     
                     SizedBox(height: screenHeight * 0.05),
                     
-                    // TOKON Logo Animation with Pulse Effect
+                    // Modern TOKON Logo Animation
                     AnimatedBuilder(
                       animation: _logoController,
                       builder: (context, child) {
@@ -133,32 +125,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           child: AnimatedBuilder(
                             animation: _scanlineController,
                             builder: (context, child) {
-                              final pulseScale = 1.0 + (0.02 * (1 - _scanlineController.value));
+                              final pulseScale = 1.0 + (0.05 * (1 - _scanlineController.value));
                               return Transform.scale(
                                 scale: pulseScale,
                                 child: Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surfaceColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(0), // Pixelated corners
-                                    border: Border.all(
-                                      color: AppTheme.primaryColor.withOpacity(0.3 + (0.2 * _scanlineController.value)),
-                                      width: 2,
-                                    ),
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: AppTheme.modernGlassEffect.copyWith(
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppTheme.primaryColor.withOpacity(0.2 + (0.1 * _scanlineController.value)),
-                                        offset: const Offset(8, 8),
-                                        blurRadius: 0,
+                                        color: AppTheme.primaryColor.withOpacity(0.3),
+                                        offset: const Offset(0, 0),
+                                        blurRadius: 40,
                                         spreadRadius: 0,
                                       ),
                                     ],
                                   ),
                                   child: TokonLogo(
-                                    size: screenWidth * 0.2,
+                                    size: screenWidth * 0.25,
                                     showText: true,
                                     coinColor: AppTheme.primaryColor,
-                                    textColor: AppTheme.primaryColor,
+                                    textColor: AppTheme.textColor,
                                   ),
                                 ),
                               );
@@ -170,7 +156,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     
                     SizedBox(height: screenHeight * 0.05),
                     
-                    // Retro App Name Animation
+                    // Modern App Name Animation
                     AnimatedBuilder(
                       animation: _textController,
                       builder: (context, child) {
@@ -179,51 +165,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           child: Transform.translate(
                             offset: Offset(0, 20 * (1 - _textController.value)),
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
                               child: Column(
                                 children: [
                                   Text(
                                     'TOKON',
-                                    style: AppTheme.retroTitle.copyWith(
-                                      fontSize: screenWidth * 0.065,
-                                      shadows: [
-                                        Shadow(
-                                          offset: const Offset(3, 3),
-                                          blurRadius: 0,
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                        Shadow(
-                                          offset: const Offset(6, 6),
-                                          blurRadius: 0,
-                                          color: AppTheme.secondaryColor,
-                                        ),
-                                      ],
+                                    style: AppTheme.modernTitle.copyWith(
+                                      fontSize: screenWidth * 0.08,
+                                      color: AppTheme.textColor,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
-                                  SizedBox(height: screenHeight * 0.012),
+                                  SizedBox(height: screenHeight * 0.02),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceColor,
-                                      borderRadius: BorderRadius.circular(0), // Pixelated
-                                      border: Border.all(
-                                        color: AppTheme.secondaryColor,
-                                        width: 2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.secondaryColor.withOpacity(0.4),
-                                          offset: const Offset(3, 3),
-                                          blurRadius: 0,
-                                        ),
-                                      ],
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    decoration: AppTheme.modernContainerDecoration,
                                     child: Text(
                                       'AR-Powered Event Goodies',
-                                      style: AppTheme.retroSubtitle.copyWith(
-                                        fontSize: screenWidth * 0.032,
-                                        color: AppTheme.textColor,
+                                      style: AppTheme.modernBodySecondary.copyWith(
+                                        fontSize: screenWidth * 0.04,
+                                        color: AppTheme.textSecondary,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
@@ -238,7 +199,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     
                     SizedBox(height: screenHeight * 0.06),
                     
-                    // Enhanced Loading Animation
+                    // Modern Loading Animation
                     AnimatedBuilder(
                       animation: _gradientController,
                       builder: (context, child) {
@@ -246,60 +207,36 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           opacity: _gradientController.value,
                           child: Column(
                             children: [
-                              // Animated Loading Spinner
+                              // Modern Loading Spinner
                               Container(
-                                width: screenWidth * 0.15,
-                                height: screenWidth * 0.15,
+                                width: screenWidth * 0.2,
+                                height: screenWidth * 0.2,
                                 constraints: const BoxConstraints(
-                                  maxWidth: 60,
-                                  maxHeight: 60,
-                                  minWidth: 40,
-                                  minHeight: 40,
+                                  maxWidth: 80,
+                                  maxHeight: 80,
+                                  minWidth: 60,
+                                  minHeight: 60,
                                 ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(0), // Pixelated
-                                  border: Border.all(
-                                    color: AppTheme.primaryColor,
-                                    width: 3,
+                                decoration: AppTheme.modernGlassEffect,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.primaryGradient,
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.primaryColor.withOpacity(0.4),
-                                      offset: const Offset(4, 4),
-                                      blurRadius: 0,
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(0), // Pixelated
-                                  child: Stack(
-                                    children: [
-                                      // Background progress
-                                      LinearProgressIndicator(
-                                        value: 0.8,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppTheme.surfaceColor.withOpacity(0.3),
-                                        ),
-                                        backgroundColor: AppTheme.surfaceColor.withOpacity(0.1),
-                                      ),
-                                      // Animated progress bar
-                                      AnimatedBuilder(
-                                        animation: _scanlineController,
-                                        builder: (context, child) {
-                                          return LinearProgressIndicator(
-                                            value: (_scanlineController.value * 0.6) + 0.2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                              AppTheme.primaryColor,
-                                            ),
-                                            backgroundColor: Colors.transparent,
-                                          );
-                                        },
-                                      ),
-                                    ],
+                                  child: AnimatedBuilder(
+                                    animation: _scanlineController,
+                                    builder: (context, child) {
+                                      return CircularProgressIndicator(
+                                        value: (_scanlineController.value * 0.6) + 0.2,
+                                        strokeWidth: 3,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textColor),
+                                        backgroundColor: Colors.white.withOpacity(0.2),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
-                              SizedBox(height: screenHeight * 0.025),
+                              SizedBox(height: screenHeight * 0.03),
                               
                               // Loading Text with Animation
                               AnimatedBuilder(
@@ -307,28 +244,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 builder: (context, child) {
                                   final dots = '...'.substring(0, ((_scanlineController.value * 3).floor() + 1).clamp(0, 3));
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceColor.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(0), // Pixelated
-                                      border: Border.all(
-                                        color: AppTheme.accentColor,
-                                        width: 2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.accentColor.withOpacity(0.3),
-                                          offset: const Offset(3, 3),
-                                          blurRadius: 0,
-                                        ),
-                                      ],
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    decoration: AppTheme.modernContainerDecoration,
                                     child: Text(
-                                      'LOADING$dots',
-                                      style: AppTheme.retroButton.copyWith(
-                                        fontSize: screenWidth * 0.035,
-                                        color: AppTheme.accentColor,
-                                        fontWeight: FontWeight.bold,
+                                      'Loading$dots',
+                                      style: AppTheme.modernButton.copyWith(
+                                        fontSize: screenWidth * 0.04,
+                                        color: AppTheme.primaryColor,
                                       ),
                                     ),
                                   );
@@ -339,20 +261,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               
                               // Subtitle
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surfaceColor.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(0), // Pixelated
-                                  border: Border.all(
-                                    color: AppTheme.textColor.withOpacity(0.2),
-                                    width: 1,
-                                  ),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                decoration: AppTheme.modernContainerDecoration.copyWith(
+                                  color: AppTheme.cardColor.withOpacity(0.5),
                                 ),
                                 child: Text(
                                   'Preparing your AR experience...',
-                                  style: AppTheme.retroBody.copyWith(
-                                    fontSize: screenWidth * 0.028,
-                                    color: AppTheme.textColor.withOpacity(0.8),
+                                  style: AppTheme.modernBodySecondary.copyWith(
+                                    fontSize: screenWidth * 0.035,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -365,26 +281,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     
                     SizedBox(height: screenHeight * 0.05),
                     
-                    // Decorative bottom border
+                    // Modern decorative element
                     Container(
-                      width: screenWidth * 0.6,
-                      height: 4,
+                      width: screenWidth * 0.4,
+                      height: 2,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.3),
-                            AppTheme.primaryColor,
-                            AppTheme.primaryColor.withOpacity(0.3),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(0),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.5),
-                            offset: const Offset(0, -2),
-                            blurRadius: 0,
-                          ),
-                        ],
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(1),
                       ),
                     ),
                   ],
@@ -398,23 +301,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 }
 
-// Enhanced custom painter for retro scanlines effect
-class RetroScanlinesPainter extends CustomPainter {
+// Modern background painter with subtle effects
+class ModernBackgroundPainter extends CustomPainter {
   final double progress;
 
-  RetroScanlinesPainter({required this.progress});
+  ModernBackgroundPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Create a gradient background effect
+    // Create a subtle gradient background
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     final gradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
       colors: [
-        AppTheme.primaryColor.withOpacity(0.05),
-        AppTheme.primaryColor.withOpacity(0.02),
-        AppTheme.primaryColor.withOpacity(0.05),
+        AppTheme.primaryColor.withOpacity(0.03),
+        AppTheme.secondaryColor.withOpacity(0.02),
+        AppTheme.accentColor.withOpacity(0.03),
       ],
       stops: const [0.0, 0.5, 1.0],
     );
@@ -422,54 +325,47 @@ class RetroScanlinesPainter extends CustomPainter {
     final paint = Paint()..shader = gradient.createShader(rect);
     canvas.drawRect(rect, paint);
 
-    // Enhanced scanlines with varying opacity and thickness
-    final lineSpacing = 3.0;
-    final totalLines = (size.height / lineSpacing).ceil();
+    // Add subtle animated particles
+    final particleCount = 20;
+    for (int i = 0; i < particleCount; i++) {
+      final x = (i * size.width / particleCount) + (progress * 50);
+      final y = (i * size.height / particleCount) + (progress * 30);
+      final opacity = (0.1 + 0.05 * (i % 3)) * progress;
+      
+      final particlePaint = Paint()
+        ..color = AppTheme.primaryColor.withOpacity(opacity)
+        ..style = PaintingStyle.fill;
 
-    for (int i = 0; i < totalLines; i++) {
-      final y = i * lineSpacing;
-      final baseOpacity = 0.08 + 0.04 * (i % 4);
-      final animatedOpacity = baseOpacity * progress;
-      
-      // Vary line thickness based on position
-      final lineThickness = (i % 3 == 0) ? 1.5 : 1.0;
-      
-      final linePaint = Paint()
-        ..color = AppTheme.primaryColor.withOpacity(animatedOpacity)
-        ..strokeWidth = lineThickness;
-
-      // Add some variation to line positions for more organic feel
-      final offset = (i % 5 == 0) ? 2.0 : 0.0;
-      
-      canvas.drawLine(
-        Offset(offset, y),
-        Offset(size.width - offset, y),
-        linePaint,
+      canvas.drawCircle(
+        Offset(x % size.width, y % size.height),
+        2.0 + (i % 3),
+        particlePaint,
       );
     }
 
-    // Add subtle corner effects
-    final cornerPaint = Paint()
-      ..color = AppTheme.primaryColor.withOpacity(0.1 * progress)
-      ..strokeWidth = 2.0;
+    // Add subtle grid pattern
+    final gridSpacing = 50.0;
+    final gridPaint = Paint()
+      ..color = AppTheme.primaryColor.withOpacity(0.02 * progress)
+      ..strokeWidth = 0.5;
 
-    final cornerSize = 20.0;
-    
-    // Top-left corner
-    canvas.drawLine(Offset(0, cornerSize), Offset(cornerSize, cornerSize), cornerPaint);
-    canvas.drawLine(Offset(cornerSize, 0), Offset(cornerSize, cornerSize), cornerPaint);
-    
-    // Top-right corner
-    canvas.drawLine(Offset(size.width - cornerSize, 0), Offset(size.width - cornerSize, cornerSize), cornerPaint);
-    canvas.drawLine(Offset(size.width - cornerSize, cornerSize), Offset(size.width, cornerSize), cornerPaint);
-    
-    // Bottom-left corner
-    canvas.drawLine(Offset(0, size.height - cornerSize), Offset(cornerSize, size.height - cornerSize), cornerPaint);
-    canvas.drawLine(Offset(cornerSize, size.height - cornerSize), Offset(cornerSize, size.height), cornerPaint);
-    
-    // Bottom-right corner
-    canvas.drawLine(Offset(size.width - cornerSize, size.height - cornerSize), Offset(size.width, size.height - cornerSize), cornerPaint);
-    canvas.drawLine(Offset(size.width - cornerSize, size.height - cornerSize), Offset(size.width - cornerSize, size.height), cornerPaint);
+    // Vertical lines
+    for (double x = 0; x < size.width; x += gridSpacing) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        gridPaint,
+      );
+    }
+
+    // Horizontal lines
+    for (double y = 0; y < size.height; y += gridSpacing) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        gridPaint,
+      );
+    }
   }
 
   @override

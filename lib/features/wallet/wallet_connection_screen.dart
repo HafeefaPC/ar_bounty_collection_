@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/services/storage_service.dart';
 import '../../shared/services/wallet_service.dart';
 import '../../shared/providers/reown_provider.dart';
+import '../../shared/services/global_wallet_service.dart';
 
 final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
 
@@ -23,6 +24,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
   bool _isConnected = false;
   String? _walletAddress;
   String? _connectionError;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -32,15 +34,27 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
 
   @override
   void dispose() {
-    _appKitModal?.dispose();
+    _isDisposed = true;
+    
+    // Remove the listener before disposing
+    if (_appKitModal != null) {
+      try {
+        _appKitModal!.removeListener(_onSessionUpdate);
+      } catch (e) {
+        debugPrint('Error removing listener during dispose: $e');
+      }
+    }
+    
+    // Don't dispose the modal here as it's managed by the provider
     super.dispose();
   }
 
   Future<void> _initializeAppKit() async {
     try {
-      // Get the ReownAppKit instance from the provider
-      final reownNotifier = ref.read(reownAppKitProvider.notifier);
-      await reownNotifier.initialize(context);
+      final globalWalletService = ref.read(globalWalletServiceProvider);
+      
+      // Ensure ReownAppKit is initialized using global service
+      await globalWalletService.ensureReownAppKitInitialized(context);
       
       _appKitModal = ref.read(reownAppKitProvider);
       
@@ -72,79 +86,79 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
   }
 
   void _onSessionUpdate() async {
-    setState(() {
-      _isConnected = _appKitModal!.isConnected;
-      _isConnecting = false;
-    });
+    // Check if widget is still mounted and not disposed before using ref
+    if (!mounted || _isDisposed) {
+      debugPrint('Widget disposed, skipping session update');
+      return;
+    }
     
-    if (_isConnected) {
-      try {
-        // Get the actual wallet address from the session
-        final session = _appKitModal!.session;
-        if (session != null && session.topic != null) {
-          // Use a placeholder address for now since the actual address isn't directly accessible
-          final walletAddress = '0x${session.topic!.substring(0, 40)}';
+    try {
+      // Get the current wallet state from the provider
+      final walletState = ref.read(walletConnectionProvider);
+      
+      if (!mounted || _isDisposed) return; // Check again after async operation
+      
+      setState(() {
+        _isConnected = walletState.isConnected;
+        _isConnecting = false;
+        _walletAddress = walletState.walletAddress;
+      });
+      
+      if (_isConnected && _walletAddress != null) {
+        try {
+          // Save wallet data locally
+          await _saveWalletData(_walletAddress!);
           
-          // First, save wallet data locally (this should always work)
-          await _saveWalletData(walletAddress);
+          if (!mounted || _isDisposed) return; // Check after async operation
           
           // Try to connect wallet using WalletService (database operation)
           final walletService = WalletService();
-          debugPrint('Attempting to connect wallet: $walletAddress');
-          final success = await walletService.connectWallet(walletAddress);
+          debugPrint('Attempting to connect wallet: $_walletAddress');
+          final success = await walletService.connectWallet(_walletAddress!);
+          
+          if (!mounted || _isDisposed) return; // Check after async operation
           
           if (success) {
-            setState(() {
-              _walletAddress = walletAddress;
-            });
-            debugPrint('Wallet connected successfully: $walletAddress');
+            debugPrint('Wallet connected successfully: $_walletAddress');
             _showSuccess('Wallet connected successfully!');
           } else {
-            // Database operation failed, but wallet is still connected
-            // Save wallet data locally and show a warning
-            setState(() {
-              _walletAddress = walletAddress;
-            });
-            debugPrint('Wallet connected but database save failed: $walletAddress');
-            
-          }
-        }
-      } catch (e) {
-        debugPrint('Error in _onSessionUpdate: $e');
-        // Even if there's an error, if the wallet is connected, we should show it as connected
-        if (_appKitModal!.isConnected) {
-          final session = _appKitModal!.session;
-          if (session != null && session.topic != null) {
-            final walletAddress = '0x${session.topic!.substring(0, 40)}';
-            await _saveWalletData(walletAddress);
-            setState(() {
-              _walletAddress = walletAddress;
-            });
+            debugPrint('Wallet connected but database save failed: $_walletAddress');
             _showWarning('Wallet connected! Some features may be limited due to sync issues.');
           }
-        } else {
-          _showError('Error processing wallet connection: $e');
+        } catch (e) {
+          debugPrint('Error in _onSessionUpdate: $e');
+          if (mounted) {
+            _showWarning('Wallet connected! Some features may be limited due to sync issues.');
+          }
+        }
+      } else {
+        // Only clear wallet data if explicitly disconnected
+        if (_walletAddress != null) {
+          _walletAddress = null;
+          await _clearWalletData();
         }
       }
-    } else {
-      // Only clear wallet data if explicitly disconnected
-      if (_walletAddress != null) {
-        _walletAddress = null;
-        await _clearWalletData();
-      }
+    } catch (e) {
+      debugPrint('Error in _onSessionUpdate (ref access): $e');
+      // Don't try to use ref or setState if there's an error
     }
   }
 
   Future<void> _connectWallet() async {
-    if (_appKitModal == null) {
-      _showError('Wallet connection not initialized');
-      return;
-    }
-
     setState(() => _isConnecting = true);
 
     try {
-      await _appKitModal!.openModalView();
+      final globalWalletService = ref.read(globalWalletServiceProvider);
+      
+      // Ensure ReownAppKit is initialized
+      await globalWalletService.ensureReownAppKitInitialized(context);
+      
+      // Use the provider's connect method
+      await ref.read(walletConnectionProvider.notifier).connect();
+      
+      // Refresh wallet state
+      globalWalletService.refreshWalletState();
+      
     } catch (e) {
       setState(() => _isConnecting = false);
       _showError('Failed to connect wallet: $e');
@@ -152,10 +166,14 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
   }
 
   Future<void> _disconnectWallet() async {
-    if (_appKitModal == null) return;
-
     try {
-      await _appKitModal!.disconnect();
+      final globalWalletService = ref.read(globalWalletServiceProvider);
+      
+      // Use the provider's disconnect method
+      await ref.read(walletConnectionProvider.notifier).disconnect();
+      
+      // Refresh wallet state
+      globalWalletService.refreshWalletState();
       
       setState(() {
         _isConnected = false;
@@ -192,38 +210,50 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
   }
 
   void _showSuccess(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppTheme.successColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
-        ),
-      );
+    if (mounted && context.mounted && !_isDisposed) {
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppTheme.successColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error showing success message: $e');
+      }
     }
   }
 
   void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppTheme.errorColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
-        ),
-      );
+    if (mounted && context.mounted && !_isDisposed) {
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppTheme.errorColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error showing error message: $e');
+      }
     }
   }
 
   void _showWarning(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppTheme.warningColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
-        ),
-      );
+    if (mounted && context.mounted && !_isDisposed) {
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppTheme.warningColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error showing warning message: $e');
+      }
     }
   }
 
@@ -237,10 +267,30 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Listen to wallet connection provider changes
+    ref.listen<WalletConnectionState>(walletConnectionProvider, (previous, next) {
+      if (mounted && context.mounted && !_isDisposed) {
+        try {
+          setState(() {
+            _isConnected = next.isConnected;
+            _walletAddress = next.walletAddress;
+            _isConnecting = false;
+          });
+          
+          // If wallet is connected, show success message
+          if (next.isConnected && previous?.isConnected != true) {
+            _showSuccess('Wallet connected successfully!');
+          }
+        } catch (e) {
+          debugPrint('Error in wallet connection listener: $e');
+        }
+      }
+    });
+
     if (!_isInitialized) {
       return Scaffold(
         body: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
+          decoration: AppTheme.modernScaffoldBackground,
           child: const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
@@ -256,7 +306,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
+        decoration: AppTheme.modernScaffoldBackground,
         child: SafeArea(
           child: SingleChildScrollView(
             child: ConstrainedBox(
@@ -269,73 +319,52 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(height: screenHeight * 0.05),
+                      SizedBox(height: screenHeight * 0.08),
 
-                      // Retro Wallet Icon
+                      // Modern Wallet Icon with Glass Effect
                       Container(
-                        width: screenWidth * 0.25,
-                        height: screenWidth * 0.25,
+                        width: screenWidth * 0.3,
+                        height: screenWidth * 0.3,
                         constraints: const BoxConstraints(
-                          maxWidth: 120,
-                          maxHeight: 120,
-                          minWidth: 80,
-                          minHeight: 80,
+                          maxWidth: 140,
+                          maxHeight: 140,
+                          minWidth: 100,
+                          minHeight: 100,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceColor,
-                          borderRadius: BorderRadius.circular(0), // Pixelated
-                          border: Border.all(
-                            color: AppTheme.primaryColor,
-                            width: 3,
+                        decoration: AppTheme.modernGlassEffect,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withOpacity(0.6),
-                              offset: const Offset(6, 6),
-                              blurRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.account_balance_wallet,
-                          size: screenWidth * 0.12,
-                          color: AppTheme.primaryColor,
+                          child: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            size: screenWidth * 0.15,
+                            color: AppTheme.textColor,
+                          ),
                         ),
                       ),
 
-                      SizedBox(height: screenHeight * 0.04),
+                      SizedBox(height: screenHeight * 0.06),
 
-                      // Retro Title
+                      // Modern Title
                       Text(
-                        'CONNECT YOUR WALLET',
-                        style: AppTheme.retroTitle.copyWith(
-                          fontSize: screenWidth * 0.07,
-                          shadows: [
-                            Shadow(
-                              offset: const Offset(3, 3),
-                              blurRadius: 0,
-                              color: AppTheme.primaryColor,
-                            ),
-                            Shadow(
-                              offset: const Offset(6, 6),
-                              blurRadius: 0,
-                              color: AppTheme.secondaryColor,
-                            ),
-                          ],
+                        'Connect Your Wallet',
+                        style: AppTheme.modernTitle.copyWith(
+                          fontSize: screenWidth * 0.08,
                         ),
                         textAlign: TextAlign.center,
                       ),
 
                       SizedBox(height: screenHeight * 0.02),
 
-                      // Retro Description
+                      // Modern Description
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05),
+                        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
                         child: Text(
-                          'Connect your Web3 wallet using WalletConnect to participate in AR airdrop events. Supports Core, MetaMask, Trust Wallet, and more.',
-                          style: AppTheme.retroBody.copyWith(
-                            fontSize: screenWidth * 0.04,
-                            color: AppTheme.textColor.withOpacity(0.9),
+                          'Connect your Web3 wallet to participate in AR airdrop events and collect unique digital assets.',
+                          style: AppTheme.modernBodySecondary.copyWith(
+                            fontSize: screenWidth * 0.045,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -343,40 +372,36 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
 
                       SizedBox(height: screenHeight * 0.04),
 
-                      // Retro Connection Error Display
+                      // Modern Connection Error Display
                       if (_connectionError != null)
                         Container(
-                          padding: EdgeInsets.all(screenWidth * 0.04),
-                          margin: EdgeInsets.only(bottom: screenHeight * 0.02),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
-                            borderRadius: BorderRadius.circular(0), // Pixelated
-                            border: Border.all(
-                              color: AppTheme.errorColor,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.errorColor.withOpacity(0.4),
-                                offset: const Offset(3, 3),
-                                blurRadius: 0,
-                              ),
-                            ],
+                          padding: EdgeInsets.all(screenWidth * 0.05),
+                          margin: EdgeInsets.only(bottom: screenHeight * 0.03),
+                          decoration: AppTheme.modernCardDecoration.copyWith(
+                            color: AppTheme.errorColor.withOpacity(0.1),
+                            border: Border.all(color: AppTheme.errorColor.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.error_outline,
-                                color: AppTheme.errorColor,
-                                size: screenWidth * 0.06,
+                              Container(
+                                padding: EdgeInsets.all(screenWidth * 0.03),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.errorColor.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.error_outline_rounded,
+                                  color: AppTheme.errorColor,
+                                  size: screenWidth * 0.06,
+                                ),
                               ),
-                              SizedBox(width: screenWidth * 0.03),
+                              SizedBox(width: screenWidth * 0.04),
                               Expanded(
                                 child: Text(
                                   _connectionError!,
-                                  style: AppTheme.retroBody.copyWith(
-                                    color: AppTheme.textColor,
-                                    fontSize: screenWidth * 0.035,
+                                  style: AppTheme.modernBodySecondary.copyWith(
+                                    color: AppTheme.errorColor,
+                                    fontSize: screenWidth * 0.04,
                                   ),
                                 ),
                               ),
@@ -384,49 +409,45 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                           ),
                         ),
 
-                      // Retro Connected Wallet Display
+                      // Modern Connected Wallet Display
                       if (_isConnected && _walletAddress != null)
                         Container(
-                          padding: EdgeInsets.all(screenWidth * 0.04),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
-                            borderRadius: BorderRadius.circular(0), // Pixelated
-                            border: Border.all(
-                              color: AppTheme.successColor,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.successColor.withOpacity(0.4),
-                                offset: const Offset(3, 3),
-                                blurRadius: 0,
-                              ),
-                            ],
+                          padding: EdgeInsets.all(screenWidth * 0.05),
+                          decoration: AppTheme.modernCardDecoration.copyWith(
+                            color: AppTheme.successColor.withOpacity(0.1),
+                            border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.check_circle,
-                                color: AppTheme.successColor,
-                                size: screenWidth * 0.06,
+                              Container(
+                                padding: EdgeInsets.all(screenWidth * 0.03),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.successColor.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppTheme.successColor,
+                                  size: screenWidth * 0.06,
+                                ),
                               ),
-                              SizedBox(width: screenWidth * 0.03),
+                              SizedBox(width: screenWidth * 0.04),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'WALLET CONNECTED',
-                                      style: AppTheme.retroSubtitle.copyWith(
+                                      'Wallet Connected',
+                                      style: AppTheme.modernSubtitle.copyWith(
+                                        fontSize: screenWidth * 0.045,
                                         color: AppTheme.textColor,
-                                        fontSize: screenWidth * 0.04,
                                       ),
                                     ),
+                                    SizedBox(height: screenHeight * 0.005),
                                     Text(
                                       '${_walletAddress!.substring(0, 6)}...${_walletAddress!.substring(_walletAddress!.length - 4)}',
-                                      style: AppTheme.retroBody.copyWith(
-                                        color: AppTheme.textColor.withOpacity(0.8),
-                                        fontSize: screenWidth * 0.035,
+                                      style: AppTheme.modernBodySecondary.copyWith(
+                                        fontSize: screenWidth * 0.04,
                                       ),
                                     ),
                                   ],
@@ -435,18 +456,15 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                               GestureDetector(
                                 onTap: _disconnectWallet,
                                 child: Container(
-                                  padding: EdgeInsets.all(screenWidth * 0.02),
+                                  padding: EdgeInsets.all(screenWidth * 0.03),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.surfaceColor,
-                                    borderRadius: BorderRadius.circular(0), // Pixelated
-                                    border: Border.all(
-                                      color: AppTheme.textColor.withOpacity(0.8),
-                                      width: 1,
-                                    ),
+                                    color: AppTheme.cardColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white.withOpacity(0.1)),
                                   ),
                                   child: Icon(
-                                    Icons.logout,
-                                    color: AppTheme.textColor.withOpacity(0.8),
+                                    Icons.logout_rounded,
+                                    color: AppTheme.textSecondary,
                                     size: screenWidth * 0.05,
                                   ),
                                 ),
@@ -457,17 +475,14 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
 
                       SizedBox(height: screenHeight * 0.04),
 
-                      // Retro Connection Buttons
+                      // Modern Connection Buttons
                       if (!_isConnected) ...[
                         SizedBox(
                           width: double.infinity,
                           height: screenHeight * 0.07,
                           child: ElevatedButton(
                             onPressed: _isConnecting ? null : _connectWallet,
-                            style: AppTheme.retroPrimaryButton.copyWith(
-                              backgroundColor: MaterialStateProperty.all(AppTheme.primaryColor),
-                              foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
-                            ),
+                            style: AppTheme.modernPrimaryButton,
                             child: _isConnecting
                                 ? Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -477,15 +492,14 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                                         height: screenWidth * 0.05,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
+                                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textColor),
                                         ),
                                       ),
                                       SizedBox(width: screenWidth * 0.03),
                                       Text(
-                                        'CONNECTING...',
-                                        style: AppTheme.retroButton.copyWith(
+                                        'Connecting...',
+                                        style: AppTheme.modernButton.copyWith(
                                           fontSize: screenWidth * 0.045,
-                                          color: AppTheme.backgroundColor,
                                         ),
                                       ),
                                     ],
@@ -494,16 +508,15 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        Icons.account_balance_wallet,
+                                        Icons.account_balance_wallet_rounded,
                                         size: screenWidth * 0.06,
-                                        color: AppTheme.backgroundColor,
+                                        color: AppTheme.textColor,
                                       ),
                                       SizedBox(width: screenWidth * 0.03),
                                       Text(
-                                        'CONNECT WALLET',
-                                        style: AppTheme.retroButton.copyWith(
+                                        'Connect Wallet',
+                                        style: AppTheme.modernButton.copyWith(
                                           fontSize: screenWidth * 0.045,
-                                          color: AppTheme.backgroundColor,
                                         ),
                                       ),
                                     ],
@@ -511,46 +524,32 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                           ),
                         ),
 
-                        SizedBox(height: screenHeight * 0.03),
+                        SizedBox(height: screenHeight * 0.04),
 
-                        // Retro Supported Wallets Info
+                        // Modern Supported Wallets Info
                         Container(
-                          padding: EdgeInsets.all(screenWidth * 0.04),
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
-                            borderRadius: BorderRadius.circular(0), // Pixelated
-                            border: Border.all(
-                              color: AppTheme.secondaryColor,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.secondaryColor.withOpacity(0.4),
-                                offset: const Offset(3, 3),
-                                blurRadius: 0,
-                              ),
-                            ],
-                          ),
+                          padding: EdgeInsets.all(screenWidth * 0.05),
+                          decoration: AppTheme.modernCardDecoration,
                           child: Column(
                             children: [
                               Text(
-                                'SUPPORTED WALLETS',
-                                style: AppTheme.retroSubtitle.copyWith(
+                                'Supported Wallets',
+                                style: AppTheme.modernSubtitle.copyWith(
+                                  fontSize: screenWidth * 0.045,
                                   color: AppTheme.textColor,
-                                  fontSize: screenWidth * 0.04,
                                 ),
                               ),
                               SizedBox(height: screenHeight * 0.02),
                               Wrap(
                                 spacing: screenWidth * 0.03,
-                                runSpacing: screenHeight * 0.01,
+                                runSpacing: screenHeight * 0.015,
                                 children: [
-                                  _buildRetroWalletChip('Core', screenWidth),
-                                  _buildRetroWalletChip('MetaMask', screenWidth),
-                                  _buildRetroWalletChip('Trust Wallet', screenWidth),
-                                  _buildRetroWalletChip('Phantom', screenWidth),
-                                  _buildRetroWalletChip('Coinbase', screenWidth),
-                                  _buildRetroWalletChip('Rainbow', screenWidth),
+                                  _buildModernWalletChip('Core', screenWidth),
+                                  _buildModernWalletChip('MetaMask', screenWidth),
+                                  _buildModernWalletChip('Trust Wallet', screenWidth),
+                                  _buildModernWalletChip('Phantom', screenWidth),
+                                  _buildModernWalletChip('Coinbase', screenWidth),
+                                  _buildModernWalletChip('Rainbow', screenWidth),
                                 ],
                               ),
                             ],
@@ -558,27 +557,25 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                         ),
                       ],
 
-                      // Retro Continue Button (when connected)
+                      // Modern Continue Button (when connected)
                       if (_isConnected)
                         SizedBox(
                           width: double.infinity,
                           height: screenHeight * 0.07,
                           child: ElevatedButton(
                             onPressed: _continueWithWallet,
-                            style: AppTheme.retroSecondaryButton.copyWith(
+                            style: AppTheme.modernPrimaryButton.copyWith(
                               backgroundColor: MaterialStateProperty.all(AppTheme.successColor),
-                              foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.arrow_forward, size: screenWidth * 0.06, color: AppTheme.backgroundColor),
+                                Icon(Icons.arrow_forward_rounded, size: screenWidth * 0.06, color: AppTheme.textColor),
                                 SizedBox(width: screenWidth * 0.03),
                                 Text(
-                                  'CONTINUE',
-                                  style: AppTheme.retroButton.copyWith(
+                                  'Continue',
+                                  style: AppTheme.modernButton.copyWith(
                                     fontSize: screenWidth * 0.045,
-                                    color: AppTheme.backgroundColor,
                                   ),
                                 ),
                               ],
@@ -586,53 +583,48 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                           ),
                         ),
 
-                      SizedBox(height: screenHeight * 0.02),
+                      SizedBox(height: screenHeight * 0.03),
 
-                      // Retro Skip Button
+                      // Modern Skip Button
                       TextButton(
                         onPressed: _skipWalletConnection,
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.textColor.withOpacity(0.8),
-                        ),
+                        style: AppTheme.modernTextButton,
                         child: Text(
-                          'SKIP FOR NOW',
-                          style: AppTheme.retroButton.copyWith(
+                          'Skip for now',
+                          style: AppTheme.modernButton.copyWith(
                             fontSize: screenWidth * 0.04,
-                            decoration: TextDecoration.underline,
+                            color: AppTheme.textSecondary,
                           ),
                         ),
                       ),
 
-                      SizedBox(height: screenHeight * 0.04),
+                      SizedBox(height: screenHeight * 0.05),
 
-                      // Retro Info Section
+                      // Modern Info Section
                       Container(
-                        padding: EdgeInsets.all(screenWidth * 0.04),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceColor,
-                          borderRadius: BorderRadius.circular(0), // Pixelated
-                          border: Border.all(
-                            color: AppTheme.accentColor,
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
+                        padding: EdgeInsets.all(screenWidth * 0.05),
+                        decoration: AppTheme.modernContainerDecoration,
+                        child: Row(
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: AppTheme.accentColor,
-                              size: screenWidth * 0.06,
+                            Container(
+                              padding: EdgeInsets.all(screenWidth * 0.03),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.info_outline_rounded,
+                                color: AppTheme.accentColor,
+                                size: screenWidth * 0.06,
+                              ),
                             ),
-                            SizedBox(height: screenHeight * 0.01),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                            SizedBox(width: screenWidth * 0.04),
+                            Expanded(
                               child: Text(
                                 'Secure wallet connection powered by WalletConnect. Your keys remain in your wallet at all times.',
-                                style: AppTheme.retroBody.copyWith(
-                                  color: AppTheme.textColor.withOpacity(0.8),
-                                  fontSize: screenWidth * 0.035,
+                                style: AppTheme.modernBodySecondary.copyWith(
+                                  fontSize: screenWidth * 0.04,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
@@ -651,25 +643,25 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
     );
   }
 
-  Widget _buildRetroWalletChip(String walletName, double screenWidth) {
+  Widget _buildModernWalletChip(String walletName, double screenWidth) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.025,
-        vertical: screenWidth * 0.015,
+        horizontal: screenWidth * 0.03,
+        vertical: screenWidth * 0.02,
       ),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(0), // Pixelated
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.textColor.withOpacity(0.2),
+          color: Colors.white.withOpacity(0.1),
           width: 1,
         ),
       ),
       child: Text(
         walletName,
-        style: AppTheme.retroBody.copyWith(
-          color: AppTheme.textColor.withOpacity(0.9),
-          fontSize: screenWidth * 0.03,
+        style: AppTheme.modernCaption.copyWith(
+          color: AppTheme.textColor,
+          fontSize: screenWidth * 0.035,
         ),
       ),
     );

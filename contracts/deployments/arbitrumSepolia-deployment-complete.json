@@ -1,0 +1,22 @@
+{
+  "network": "arbitrumSepolia",
+  "deployer": "0x1570a891556eF3A181658EaD5AA409B21C7Cd42d",
+  "chainId": 421614,
+  "deployedAt": "2025-09-04T18:33:50.622Z",
+  "contracts": {
+    "EventFactory": "0xf7bECe16CC3182C1890eC722cbd0E29aC61F888D",
+    "ClaimVerification": "0xf9c06Bf0C78E6738871BA2F2C2365244fbBB3046",
+    "BoundaryNFT": "0x1F2F71fa673a38CBC5848985A74713bDfB584578"
+  },
+  "deploymentTx": {
+    "EventFactory": "0x47b2ee30c63c5c31b3afe9b6ca4583dace92d6cb98453baf7af9254ed3e70e91",
+    "ClaimVerification": "0x3c3edfaa9ab0338cdceb2f1a4b4eeddcfb1d325bf3a6a4c89b9ed812ecfc4eac",
+    "BoundaryNFT": "0x20ea0e64d713ca8f0a9708224606e2629afd2c524d80afb2cadd807fd173879b"
+  },
+  "gasUsed": {
+    "EventFactory": "2126583",
+    "ClaimVerification": "1961872",
+    "BoundaryNFT": "3829301"
+  },
+  "abis": {}
+}

@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/providers/reown_provider.dart';
+import '../../../shared/services/global_wallet_service.dart';
 
 class WalletOptionsScreen extends ConsumerStatefulWidget {
   const WalletOptionsScreen({super.key});
@@ -51,15 +52,21 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
 
   void _checkWalletStatus() async {
     try {
-      // Get wallet connection state from the provider
-      final walletState = ref.read(walletConnectionProvider);
+      final globalWalletService = ref.read(globalWalletServiceProvider);
       
-      debugPrint('Wallet status check - Connected: ${walletState.isConnected}, Address: ${walletState.walletAddress}');
+      // Restore wallet state using global service
+      await globalWalletService.restoreWalletState();
+      
+      // Get current wallet state
+      final isConnected = globalWalletService.isWalletConnected();
+      final walletAddress = globalWalletService.getWalletAddress();
+      
+      debugPrint('Wallet status check - Connected: $isConnected, Address: $walletAddress');
       
       if (mounted) {
         setState(() {
-          _isConnected = walletState.isConnected;
-          _walletAddress = walletState.walletAddress;
+          _isConnected = isConnected;
+          _walletAddress = walletAddress;
         });
       }
     } catch (e) {
@@ -123,6 +130,27 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
           _isConnected = next.isConnected;
           _walletAddress = next.walletAddress;
         });
+        
+        // Show notification when wallet connection status changes
+        if (previous?.isConnected != next.isConnected) {
+          if (next.isConnected) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Wallet connected successfully!'),
+                backgroundColor: AppTheme.successColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              ),
+            );
+          } else if (previous?.isConnected == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Wallet disconnected'),
+                backgroundColor: AppTheme.warningColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+              ),
+            );
+          }
+        }
       }
     });
 
@@ -135,14 +163,14 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
+        decoration: AppTheme.modernScaffoldBackground,
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
               _checkWalletStatus();
             },
             color: AppTheme.primaryColor,
-            backgroundColor: AppTheme.surfaceColor,
+            backgroundColor: AppTheme.cardColor,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: ConstrainedBox(
@@ -157,23 +185,23 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
                   ),
                   child: Column(
                     children: [
-                      // Retro Header with animation
-                      _buildRetroAnimatedHeader(screenWidth, screenHeight),
+                      // Modern Header with animation
+                      _buildModernAnimatedHeader(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.05),
                       
-                      // Retro Wallet Status Card with animation
-                      _buildRetroAnimatedWalletCard(screenWidth, screenHeight),
+                      // Modern Wallet Status Card with animation
+                      _buildModernAnimatedWalletCard(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.05),
                       
-                      // Retro Options with staggered animations
-                      _buildRetroAnimatedOptions(screenWidth, screenHeight),
+                      // Modern Options with staggered animations
+                      _buildModernAnimatedOptions(screenWidth, screenHeight),
                       
                       SizedBox(height: screenHeight * 0.04),
                       
-                      // Retro Wallet Actions with animation
-                      _buildRetroAnimatedWalletActions(screenWidth, screenHeight),
+                      // Modern Wallet Actions with animation
+                      _buildModernAnimatedWalletActions(screenWidth, screenHeight),
                       
                       // Bottom Spacer
                       SizedBox(height: screenHeight * 0.03),
@@ -189,23 +217,16 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     );
   }
 
-  Widget _buildRetroAnimatedHeader(double screenWidth, double screenHeight) {
+  Widget _buildModernAnimatedHeader(double screenWidth, double screenHeight) {
     return Row(
       children: [
         Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceColor,
-            borderRadius: BorderRadius.circular(0), // Pixelated
-            border: Border.all(
-              color: AppTheme.textColor.withOpacity(0.2),
-              width: 2,
-            ),
-          ),
+          decoration: AppTheme.modernContainerDecoration,
           child: IconButton(
             onPressed: () => context.go('/wallet/connect'),
-            icon: Icon(Icons.arrow_back, color: AppTheme.textColor, size: screenWidth * 0.06),
+            icon: Icon(Icons.arrow_back_rounded, color: AppTheme.textColor, size: screenWidth * 0.06),
             style: IconButton.styleFrom(
-              backgroundColor: AppTheme.surfaceColor,
+              backgroundColor: Colors.transparent,
               padding: EdgeInsets.all(screenWidth * 0.03),
             ),
           ),
@@ -216,8 +237,8 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         SizedBox(width: screenWidth * 0.04),
         Expanded(
           child: Text(
-            'WELCOME TO TOKON',
-            style: AppTheme.retroTitle.copyWith(
+            'Welcome to TOKON',
+            style: AppTheme.modernTitle.copyWith(
               fontSize: screenWidth * 0.065,
               color: AppTheme.textColor,
             ),
@@ -230,38 +251,31 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     );
   }
 
-  Widget _buildRetroAnimatedWalletCard(double screenWidth, double screenHeight) {
+  Widget _buildModernAnimatedWalletCard(double screenWidth, double screenHeight) {
     return Container(
-      padding: EdgeInsets.all(screenWidth * 0.05),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(0), // Pixelated
-        border: Border.all(
-          color: AppTheme.primaryColor,
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.4),
-            offset: const Offset(4, 4),
-            blurRadius: 0,
-          ),
-        ],
-      ),
+      padding: EdgeInsets.all(screenWidth * 0.06),
+      decoration: AppTheme.modernCardDecoration,
       child: Column(
         children: [
-          Icon(
-            _isConnected ? Icons.account_balance_wallet : Icons.account_balance_wallet_outlined,
-            size: screenWidth * 0.12,
-            color: _isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.8),
+          Container(
+            padding: EdgeInsets.all(screenWidth * 0.04),
+            decoration: BoxDecoration(
+              gradient: _isConnected ? AppTheme.primaryGradient : AppTheme.cardGradient,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _isConnected ? Icons.account_balance_wallet_rounded : Icons.account_balance_wallet_outlined,
+              size: screenWidth * 0.12,
+              color: AppTheme.textColor,
+            ),
           ).animate().fadeIn(
             duration: 600.ms,
             delay: 400.ms,
           ),
           SizedBox(height: screenHeight * 0.02),
           Text(
-            _isConnected ? 'WALLET CONNECTED' : 'NO WALLET CONNECTED',
-            style: AppTheme.retroSubtitle.copyWith(
+            _isConnected ? 'Wallet Connected' : 'No Wallet Connected',
+            style: AppTheme.modernSubtitle.copyWith(
               fontSize: screenWidth * 0.05,
               color: AppTheme.textColor,
             ),
@@ -273,21 +287,14 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
           if (_isConnected && _walletAddress != null) ...[
             SizedBox(height: screenHeight * 0.015),
             Container(
-              padding: EdgeInsets.all(screenWidth * 0.03),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(0), // Pixelated
-                border: Border.all(
-                  color: AppTheme.textColor.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
+              padding: EdgeInsets.all(screenWidth * 0.04),
+              decoration: AppTheme.modernContainerDecoration,
               child: Text(
                 _walletAddress!,
-                style: AppTheme.retroBody.copyWith(
+                style: AppTheme.modernBodySecondary.copyWith(
                   fontSize: screenWidth * 0.035,
-                  color: AppTheme.textColor.withOpacity(0.9),
-                  fontFamily: 'Courier',
+                  color: AppTheme.textSecondary,
+                  fontFamily: 'SF Mono',
                 ),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
@@ -305,13 +312,13 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     );
   }
 
-  Widget _buildRetroAnimatedOptions(double screenWidth, double screenHeight) {
+  Widget _buildModernAnimatedOptions(double screenWidth, double screenHeight) {
     return Column(
       children: [
         // Join Event Option
-        _buildRetroAnimatedOptionCard(
-          icon: Icons.qr_code,
-          title: 'JOIN EVENT',
+        _buildModernAnimatedOptionCard(
+          icon: Icons.qr_code_scanner_rounded,
+          title: 'Join Event',
           subtitle: 'Enter event code to participate',
           onTap: () => context.go('/event/join'),
           screenWidth: screenWidth,
@@ -322,9 +329,9 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         SizedBox(height: screenHeight * 0.025),
         
         // Create Event Option
-        _buildRetroAnimatedOptionCard(
-          icon: Icons.add_location,
-          title: 'CREATE EVENT',
+        _buildModernAnimatedOptionCard(
+          icon: Icons.add_location_alt_rounded,
+          title: 'Create Event',
           subtitle: 'Set up a new AR airdrop event',
           onTap: () => context.go('/event/create'),
           screenWidth: screenWidth,
@@ -335,9 +342,9 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         SizedBox(height: screenHeight * 0.025),
         
         // Boundary History Option
-        _buildRetroAnimatedOptionCard(
-          icon: Icons.history,
-          title: 'MY BOUNDARY COLLECTION',
+        _buildModernAnimatedOptionCard(
+          icon: Icons.history_rounded,
+          title: 'My Boundary Collection',
           subtitle: 'View all your claimed boundaries from different events',
           onTap: () => context.go('/boundary-history'),
           screenWidth: screenWidth,
@@ -348,7 +355,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     );
   }
 
-  Widget _buildRetroAnimatedOptionCard({
+  Widget _buildModernAnimatedOptionCard({
     required IconData icon,
     required String title,
     required String subtitle,
@@ -361,40 +368,19 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(screenWidth * 0.05),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceColor,
-          borderRadius: BorderRadius.circular(0), // Pixelated
-          border: Border.all(
-            color: AppTheme.secondaryColor,
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.secondaryColor.withOpacity(0.4),
-              offset: const Offset(3, 3),
-              blurRadius: 0,
-            ),
-          ],
-        ),
+        decoration: AppTheme.modernCardDecoration,
         child: Row(
           children: [
             Container(
               width: screenWidth * 0.12,
               height: screenWidth * 0.12,
               decoration: BoxDecoration(
-                gradient: AppTheme.retroGradient,
-                borderRadius: BorderRadius.circular(0), // Pixelated
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.4),
-                    offset: const Offset(3, 3),
-                    blurRadius: 0,
-                  ),
-                ],
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 icon,
-                color: AppTheme.backgroundColor,
+                color: AppTheme.textColor,
                 size: screenWidth * 0.06,
               ),
             ),
@@ -405,7 +391,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
                 children: [
                   Text(
                     title,
-                    style: AppTheme.retroSubtitle.copyWith(
+                    style: AppTheme.modernSubtitle.copyWith(
                       fontSize: screenWidth * 0.045,
                       color: AppTheme.textColor,
                     ),
@@ -413,17 +399,16 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
                   SizedBox(height: screenHeight * 0.005),
                   Text(
                     subtitle,
-                    style: AppTheme.retroBody.copyWith(
+                    style: AppTheme.modernBodySecondary.copyWith(
                       fontSize: screenWidth * 0.035,
-                      color: AppTheme.textColor.withOpacity(0.7),
                     ),
                   ),
                 ],
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios,
-              color: AppTheme.textColor.withOpacity(0.5),
+              Icons.arrow_forward_ios_rounded,
+              color: AppTheme.textSecondary,
               size: screenWidth * 0.04,
             ),
           ],
@@ -435,29 +420,23 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
     );
   }
 
-  Widget _buildRetroAnimatedWalletActions(double screenWidth, double screenHeight) {
+  Widget _buildModernAnimatedWalletActions(double screenWidth, double screenHeight) {
     if (_isConnected) {
       return SizedBox(
         width: double.infinity,
         height: screenHeight * 0.06,
         child: OutlinedButton(
           onPressed: _disconnectWallet,
-          style: AppTheme.retroOutlinedButton.copyWith(
-            side: MaterialStateProperty.all(BorderSide(
-              color: AppTheme.textColor.withOpacity(0.4),
-              width: 2,
-            )),
-          ),
+          style: AppTheme.modernOutlinedButton,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.logout, size: screenWidth * 0.05, color: AppTheme.textColor),
+              Icon(Icons.logout_rounded, size: screenWidth * 0.05, color: AppTheme.textColor),
               SizedBox(width: screenWidth * 0.02),
               Text(
-                'DISCONNECT WALLET',
-                style: AppTheme.retroButton.copyWith(
+                'Disconnect Wallet',
+                style: AppTheme.modernButton.copyWith(
                   fontSize: screenWidth * 0.04,
-                  color: AppTheme.textColor,
                 ),
               ),
             ],
@@ -480,20 +459,16 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
               context.go('/wallet/connect');
             }
           },
-          style: AppTheme.retroPrimaryButton.copyWith(
-            backgroundColor: MaterialStateProperty.all(AppTheme.textColor),
-            foregroundColor: MaterialStateProperty.all(AppTheme.backgroundColor),
-          ),
+          style: AppTheme.modernPrimaryButton,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.link, size: screenWidth * 0.05, color: AppTheme.backgroundColor),
+              Icon(Icons.link_rounded, size: screenWidth * 0.05, color: AppTheme.textColor),
               SizedBox(width: screenWidth * 0.02),
               Text(
-                'CONNECT WALLET',
-                style: AppTheme.retroButton.copyWith(
+                'Connect Wallet',
+                style: AppTheme.modernButton.copyWith(
                   fontSize: screenWidth * 0.04,
-                  color: AppTheme.backgroundColor,
                 ),
               ),
             ],

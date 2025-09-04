@@ -1,6 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x069b34ec0c3ade510c6a11a73dc37926d99d75163ecd64f3be006d581fcf2c09";
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "3009eef2ac66c793320e1ee0cecdd2aec069aceb0f161b0b13e88857b9a7cbf7";
+const ARBITRUM_SEPOLIA_RPC_URL = process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
+const ARBISCAN_API_KEY = process.env.ARBISCAN_API_KEY || "";
 const AVALANCHE_RPC_URL = process.env.AVALANCHE_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
 const SNOWTRACE_API_KEY = process.env.SNOWTRACE_API_KEY || "";
 
@@ -20,6 +22,13 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545"
     },
+    arbitrumSepolia: {
+      url: ARBITRUM_SEPOLIA_RPC_URL,
+      chainId: 421614,
+      accounts: [PRIVATE_KEY],
+      gas: 8000000,
+      gasPrice: 100000000, // 0.1 gwei
+    },
     fuji: {
       url: AVALANCHE_RPC_URL,
       chainId: 43113,
@@ -37,6 +46,7 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
+      arbitrumSepolia: ARBISCAN_API_KEY,
       avalancheFujiTestnet: SNOWTRACE_API_KEY,
       avalanche: SNOWTRACE_API_KEY,
     },

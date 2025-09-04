@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:face_reflector/core/theme/app_theme.dart';
 import 'package:face_reflector/core/routing/app_router.dart';
 import 'package:face_reflector/core/providers/providers.dart';
 import 'package:face_reflector/shared/providers/reown_provider.dart';
+import 'package:face_reflector/shared/services/global_wallet_service.dart';
+import 'package:face_reflector/core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +20,7 @@ void main() async {
     
     // Test the connection immediately
     final client = Supabase.instance.client;
-    print('Supabase client created: ${client != null}');
+    print('Supabase client created successfully');
     
     // Try to make a simple test query
     try {
@@ -53,15 +54,20 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
   @override
   void initState() {
     super.initState();
-    _initializeReownAppKit();
+    _initializeServices();
   }
 
-  Future<void> _initializeReownAppKit() async {
+  Future<void> _initializeServices() async {
     try {
+      // Initialize global wallet service
+      final globalWalletService = ref.read(globalWalletServiceProvider);
+      await globalWalletService.initialize(ref);
+      
+      // Initialize ReownAppKit
       await ref.read(reownAppKitProvider.notifier).initialize(context);
       print('ReownAppKit initialized successfully in main app');
     } catch (e) {
-      print('Error initializing ReownAppKit in main app: $e');
+      print('Error initializing services in main app: $e');
     }
   }
 
@@ -69,13 +75,61 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     
-    return MaterialApp.router(
-      title: 'TOKON',
-      debugShowCheckedModeBanner: false,
-      // theme: AppTheme.lightTheme,
-      // darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      routerConfig: router,
-    );
+            return Localizations(
+          locale: const Locale('en', 'US'),
+          delegates: const [
+            DefaultMaterialLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          child: MaterialApp.router(
+            title: 'TOKON',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: AppTheme.primaryColor,
+                brightness: Brightness.dark,
+                primary: AppTheme.primaryColor,
+                secondary: AppTheme.secondaryColor,
+                surface: AppTheme.surfaceColor,
+                background: AppTheme.backgroundColor,
+                onPrimary: AppTheme.textColor,
+                onSecondary: AppTheme.textColor,
+                onSurface: AppTheme.textColor,
+                onBackground: AppTheme.textColor,
+              ),
+              scaffoldBackgroundColor: AppTheme.backgroundColor,
+              appBarTheme: AppTheme.modernAppBarTheme,
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: AppTheme.modernPrimaryButton,
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: AppTheme.modernOutlinedButton,
+              ),
+              textButtonTheme: TextButtonThemeData(
+                style: AppTheme.modernTextButton,
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: AppTheme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+            routerConfig: router,
+            locale: const Locale('en', 'US'),
+          ),
+        );
   }
 }
