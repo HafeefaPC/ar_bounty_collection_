@@ -14,6 +14,7 @@ class AppTheme {
   static const Color errorColor = Color(0xFFEF4444); // Modern Red
   static const Color warningColor = Color(0xFFF59E0B); // Modern Amber
   static const Color infoColor = Color(0xFF3B82F6); // Modern Blue
+  static const Color borderColor = Color(0xFF374151); // Border Color
 
   // Modern Gradients inspired by Sinport
   static const LinearGradient primaryGradient = LinearGradient(
@@ -112,6 +113,47 @@ class AppTheme {
     color: textSecondary,
     letterSpacing: 0.0,
     height: 1.3,
+  );
+
+  // Additional text styles for compatibility
+  static const TextStyle modernHeadlineSmall = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    color: textColor,
+    fontFamily: 'SF Pro Text',
+    letterSpacing: 0.15,
+  );
+
+  static const TextStyle modernBodyLarge = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    color: textColor,
+    fontFamily: 'SF Pro Text',
+    letterSpacing: 0.5,
+  );
+
+  static const TextStyle modernBodyMedium = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: textColor,
+    fontFamily: 'SF Pro Text',
+    letterSpacing: 0.25,
+  );
+
+  static const TextStyle modernBodySmall = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: textSecondary,
+    fontFamily: 'SF Pro Text',
+    letterSpacing: 0.4,
+  );
+
+  static const TextStyle modernLabelLarge = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    color: textColor,
+    fontFamily: 'SF Pro Text',
+    letterSpacing: 0.1,
   );
 
   // Modern Button Styles inspired by Sinport

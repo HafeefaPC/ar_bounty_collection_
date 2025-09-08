@@ -1,5 +1,12 @@
 class ContractsConfig {
-  // Contract addresses for Avalanche Fuji testnet
+  // Contract addresses for Arbitrum Sepolia testnet (UPDATED - Latest Deployment)
+  static const Map<String, String> arbitrumSepoliaContracts = {
+    'EventFactory': '0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d',
+    'BoundaryNFT': '0xC585B8e492210FbEDbFE8BB353366DC968c9F77A',
+    'ClaimVerification': '0xed4468D5f1247dfD6BD19Dd54BD91278B647d6Aa',
+  };
+
+  // Contract addresses for Avalanche Fuji testnet (legacy)
   static const Map<String, String> fujiContracts = {
     'EventFactory': '0x1234567890123456789012345678901234567890',
     'BoundaryNFT': '0x2345678901234567890123456789012345678901',
@@ -15,6 +22,14 @@ class ContractsConfig {
 
   // Network configurations
   static const Map<String, Map<String, dynamic>> networkConfigs = {
+    'arbitrumSepolia': {
+      'name': 'Arbitrum Sepolia Testnet',
+      'chainId': 421614,
+      'rpcUrl': 'https://sepolia-rollup.arbitrum.io/rpc',
+      'nativeCurrency': 'ETH',
+      'blockExplorer': 'https://sepolia.arbiscan.io',
+      'contracts': arbitrumSepoliaContracts,
+    },
     'fuji': {
       'name': 'Avalanche Fuji Testnet',
       'chainId': 43113,
@@ -34,7 +49,7 @@ class ContractsConfig {
   };
 
   // Default network
-  static const String defaultNetwork = 'fuji';
+  static const String defaultNetwork = 'arbitrumSepolia';
 
   // Get contract addresses for a specific network
   static Map<String, String> getContracts(String network) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/reown_provider.dart';
@@ -20,8 +21,29 @@ class GlobalWalletService {
     
     debugPrint('GlobalWalletService: Initialized');
     
+    // Set up periodic sync to ensure state consistency
+    _setupPeriodicSync();
+    
     // Try to restore wallet state on app startup
     await restoreWalletState();
+  }
+
+  /// Set up periodic state synchronization
+  void _setupPeriodicSync() {
+    // Sync every 5 seconds to ensure state consistency across pages
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_isInitialized || _ref == null) {
+        timer.cancel();
+        return;
+      }
+      
+      try {
+        final walletNotifier = _ref!.read(walletConnectionProvider.notifier);
+        walletNotifier.refreshConnectionState();
+      } catch (e) {
+        debugPrint('GlobalWalletService: Error in periodic sync: $e');
+      }
+    });
   }
 
   /// Restore wallet connection state

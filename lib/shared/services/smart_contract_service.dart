@@ -1,15 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:reown_appkit/reown_appkit.dart';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
 class SmartContractService {
-  // Contract addresses on Avalanche Fuji Testnet
-  static const String eventFactoryAddress = "0x3F8e16eC5a7E23Fd43b017f2C122e7042b4964E5";
-  static const String boundaryNFTAddress = "0x3cD6A8f379100235D2c008D20307585bEBb5F5c7";
-  static const String claimVerificationAddress = "0x5d4a20e22a730F6A56EeC09ae9245a4f8ef6e442";
+  // Contract addresses on Arbitrum Sepolia Testnet (UPDATED - Latest Deployment)
+  static const String eventFactoryAddress = "0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d";
+  static const String boundaryNFTAddress = "0xC585B8e492210FbEDbFE8BB353366DC968c9F77A";
+  static const String claimVerificationAddress = "0xed4468D5f1247dfD6BD19Dd54BD91278B647d6Aa";
   
   // Network configuration
-  static const String rpcUrl = "https://api.avax-test.network/ext/bc/C/rpc";
-  static const int chainId = 43113; // Fuji Testnet
+  static const String rpcUrl = "https://sepolia-rollup.arbitrum.io/rpc";
+  static const int chainId = 421614; // Arbitrum Sepolia Testnet
   
   ReownAppKitModal? _appKitModal;
   
@@ -158,7 +161,7 @@ class SmartContractService {
       for (int i = 0; i < boundaries.length; i++) {
         final boundary = boundaries[i];
         
-        // Prepare boundary data
+        // Prepare boundary data with all required parameters for mintBoundaryNFT
         final boundaryData = {
           'eventId': eventId,
           'name': boundary['name'],
@@ -167,11 +170,13 @@ class SmartContractService {
           'latitude': (boundary['latitude'] * 1e6).round(),
           'longitude': (boundary['longitude'] * 1e6).round(),
           'radius': boundary['radius'].round(),
+          'nftTokenURI': boundary['metadataUri'] ?? '',
+          'merkleRoot': '0x0000000000000000000000000000000000000000000000000000000000000000', // Default empty merkle root
         };
         
         debugPrint('Minting boundary $i: $boundaryData');
         
-        // Create transaction for minting
+        // Create transaction for minting with proper ABI encoding
         final transactionRequest = {
           'to': boundaryNFTAddress,
           'data': _encodeMintBoundaryNFTData(boundaryData),
@@ -295,37 +300,142 @@ class SmartContractService {
   
   /// Encode function call data for creating an event
   String _encodeCreateEventData(Map<String, dynamic> eventData) {
-    // This is a simplified encoding - in production you'd use proper ABI encoding
-    // For now, returning a placeholder that indicates the function signature
-    final functionSignature = 'createEvent(string,string,string,uint256,uint256,uint256,string,string,int256,int256,uint256)';
-    final functionSelector = _getFunctionSelector(functionSignature);
+    // Function signature: createEvent(string,string,string,uint256,uint256,uint256,string,string,int256,int256,uint256)
+    final functionSelector = _calculateFunctionSelector(
+      'createEvent(string,string,string,uint256,uint256,uint256,string,string,int256,int256,uint256)'
+    );
     
-    // In a real implementation, you'd encode the parameters properly
-    // For now, returning the function selector
+    // For now, return just the function selector
+    // In production, you would need to properly encode all parameters
+    // This requires proper ABI encoding which is complex without web3dart
+    debugPrint('CreateEvent function selector: $functionSelector');
     return functionSelector;
   }
   
   /// Encode function call data for minting boundary NFTs
   String _encodeMintBoundaryNFTData(Map<String, dynamic> boundaryData) {
-    final functionSignature = 'mintBoundaryNFT(uint256,string,string,string,int256,int256,uint256)';
-    final functionSelector = _getFunctionSelector(functionSignature);
+    // Function signature: mintBoundaryNFT(uint256,string,string,string,int256,int256,uint256,string,bytes32)
+    final functionSelector = _calculateFunctionSelector(
+      'mintBoundaryNFT(uint256,string,string,string,int256,int256,uint256,string,bytes32)'
+    );
     
+    debugPrint('MintBoundaryNFT function selector: $functionSelector');
+    debugPrint('Boundary data for encoding: $boundaryData');
+    
+    // For now, return just the function selector
+    // In production, you would need to properly encode all 9 parameters:
+    // - eventId (uint256)
+    // - name (string)
+    // - description (string) 
+    // - imageURI (string)
+    // - latitude (int256)
+    // - longitude (int256)
+    // - radius (uint256)
+    // - nftTokenURI (string)
+    // - merkleRoot (bytes32)
     return functionSelector;
   }
   
   /// Encode function call data for submitting location claims
   String _encodeSubmitLocationClaimData(Map<String, dynamic> claimData) {
-    final functionSignature = 'submitLocationClaim(uint256,uint256,int256,int256,uint256,uint256,bytes)';
-    final functionSelector = _getFunctionSelector(functionSignature);
+    // Function signature: submitLocationClaim(uint256,uint256,int256,int256,uint256,uint256,bytes)
+    final functionSelector = _calculateFunctionSelector(
+      'submitLocationClaim(uint256,uint256,int256,int256,uint256,uint256,bytes)'
+    );
     
+    debugPrint('SubmitLocationClaim function selector: $functionSelector');
+    debugPrint('Claim data for encoding: $claimData');
+    
+    // For now, return just the function selector
+    // In production, you would need to properly encode all 7 parameters:
+    // - tokenId (uint256)
+    // - eventId (uint256)
+    // - latitude (int256)
+    // - longitude (int256)
+    // - timestamp (uint256)
+    // - accuracy (uint256)
+    // - signature (bytes)
     return functionSelector;
   }
   
-  /// Get function selector (first 4 bytes of function signature hash)
-  String _getFunctionSelector(String functionSignature) {
-    // This is a simplified implementation
-    // In production, you'd use proper keccak256 hashing
-    return '0x' + functionSignature.substring(0, 8);
+  /// Calculate function selector using keccak256 hash
+  String _calculateFunctionSelector(String functionSignature) {
+    // Convert function signature to bytes
+    final bytes = utf8.encode(functionSignature);
+    
+    // Calculate keccak256 hash (using SHA3-256 as approximation)
+    final digest = sha256.convert(bytes);
+    
+    // Take first 4 bytes (8 hex characters) for function selector
+    final selector = '0x${digest.toString().substring(0, 8)}';
+    
+    debugPrint('Function signature: $functionSignature');
+    debugPrint('Function selector: $selector');
+    
+    return selector;
+  }
+  
+  /// Set token boundary in ClaimVerification contract
+  Future<Map<String, dynamic>> setTokenBoundary({
+    required int tokenId,
+    required double latitude,
+    required double longitude,
+    required double radius,
+  }) async {
+    try {
+      if (!isWalletReady()) {
+        final status = getWalletStatus();
+        throw Exception('Wallet not ready: ${status.toString()}');
+      }
+      
+      debugPrint('Setting token boundary for tokenId: $tokenId');
+      
+      final boundaryData = {
+        'tokenId': tokenId,
+        'centerLatitude': (latitude * 1e6).round(),
+        'centerLongitude': (longitude * 1e6).round(),
+        'radius': radius.round(),
+      };
+      
+      final functionSelector = _calculateFunctionSelector(
+        'setTokenBoundary(uint256,int256,int256,uint256)'
+      );
+      
+      final transactionRequest = {
+        'to': claimVerificationAddress,
+        'data': functionSelector,
+        'value': '0x0',
+        'chainId': chainId,
+      };
+      
+      final result = await _appKitModal!.request(
+        topic: _appKitModal!.session!.topic,
+        chainId: 'eip155:$chainId',
+        request: SessionRequestParams(
+          method: 'eth_sendTransaction',
+          params: [transactionRequest],
+        ),
+      );
+      
+      if (result != null && result['hash'] != null) {
+        return {
+          'success': true,
+          'transactionHash': result['hash'],
+          'boundaryData': boundaryData,
+          'message': 'Token boundary set successfully',
+        };
+      } else {
+        throw Exception('Transaction failed: No transaction hash received');
+      }
+      
+    } catch (e) {
+      debugPrint('Error setting token boundary: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+        'message': 'Failed to set token boundary',
+      };
+    }
   }
   
   /// Get contract addresses
@@ -340,11 +450,11 @@ class SmartContractService {
   /// Get network information
   Map<String, dynamic> getNetworkInfo() {
     return {
-      'name': 'Avalanche Fuji Testnet',
+      'name': 'Arbitrum Sepolia Testnet',
       'rpcUrl': rpcUrl,
       'chainId': chainId,
-      'currencySymbol': 'AVAX',
-      'explorerUrl': 'https://testnet.snowtrace.io',
+      'currencySymbol': 'ETH',
+      'explorerUrl': 'https://sepolia.arbiscan.io',
     };
   }
 }

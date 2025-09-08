@@ -51,10 +51,8 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
 
   Future<void> _initializeAppKit() async {
     try {
-      final globalWalletService = ref.read(globalWalletServiceProvider);
-      
-      // Ensure ReownAppKit is initialized using global service
-      await globalWalletService.ensureReownAppKitInitialized(context);
+      // Initialize ReownAppKit directly
+      await ref.read(reownAppKitProvider.notifier).initialize(context);
       
       _appKitModal = ref.read(reownAppKitProvider);
       
@@ -62,26 +60,28 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
         // Listen for session events
         _appKitModal!.addListener(_onSessionUpdate);
 
-        // Check if already connected
+        // Check current connection state
+        final walletState = ref.read(walletConnectionProvider);
         setState(() {
-          _isConnected = _appKitModal!.isConnected;
-          // We'll get the address after connection in the session listener
-          _walletAddress = null;
+          _isConnected = walletState.isConnected;
+          _walletAddress = walletState.walletAddress;
         });
 
         setState(() {
           _isInitialized = true;
           _connectionError = null;
         });
+        
+        debugPrint('WalletConnection screen initialized successfully');
       } else {
         throw Exception('Failed to get ReownAppKit instance');
       }
     } catch (e) {
+      debugPrint('Error initializing wallet connection: $e');
       setState(() {
         _isInitialized = true;
-        _connectionError = 'Failed to initialize wallet connection: $e';
+        _connectionError = 'Failed to initialize wallet connection. Please try again.';
       });
-      _showError('Failed to initialize wallet connection: $e');
     }
   }
 
@@ -105,6 +105,17 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
       });
       
       if (_isConnected && _walletAddress != null) {
+        // CRITICAL: Check if we're on the wrong network
+        final chainId = walletState.chainId?.replaceAll('eip155:', '') ?? '';
+        
+        if (chainId != '421614') {
+          debugPrint('Connected to wrong network: $chainId, attempting to switch to Arbitrum Sepolia');
+          
+          // Show network switch dialog
+          _showNetworkSwitchDialog(chainId);
+          return; // Don't proceed with wallet connection until network is correct
+        }
+        
         try {
           // Save wallet data locally
           await _saveWalletData(_walletAddress!);
@@ -120,7 +131,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
           
           if (success) {
             debugPrint('Wallet connected successfully: $_walletAddress');
-            _showSuccess('Wallet connected successfully!');
+            _showSuccess('Wallet connected successfully on Arbitrum Sepolia!');
           } else {
             debugPrint('Wallet connected but database save failed: $_walletAddress');
             _showWarning('Wallet connected! Some features may be limited due to sync issues.');
@@ -148,18 +159,24 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
     setState(() => _isConnecting = true);
 
     try {
-      final globalWalletService = ref.read(globalWalletServiceProvider);
+      debugPrint('Starting wallet connection process...');
       
-      // Ensure ReownAppKit is initialized
-      await globalWalletService.ensureReownAppKitInitialized(context);
+      // Ensure ReownAppKit is ready
+      if (_appKitModal == null) {
+        await _initializeAppKit();
+      }
+      
+      if (_appKitModal == null) {
+        throw Exception('ReownAppKit not initialized');
+      }
       
       // Use the provider's connect method
       await ref.read(walletConnectionProvider.notifier).connect();
       
-      // Refresh wallet state
-      globalWalletService.refreshWalletState();
+      debugPrint('Wallet connection request sent');
       
     } catch (e) {
+      debugPrint('Error connecting wallet: $e');
       setState(() => _isConnecting = false);
       _showError('Failed to connect wallet: $e');
     }
@@ -663,6 +680,297 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
           color: AppTheme.textColor,
           fontSize: screenWidth * 0.035,
         ),
+      ),
+    );
+  }
+
+  // Add this method to show network switch dialog
+  void _showNetworkSwitchDialog(String currentChainId) {
+    if (!mounted || _isDisposed) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warningColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.warning_rounded,
+                color: AppTheme.warningColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Wrong Network',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You\'re connected to ${_getChainName(currentChainId)} but this app requires Arbitrum Sepolia testnet.',
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Required Network:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textColor,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Arbitrum Sepolia Testnet',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textColor,
+                    ),
+                  ),
+                  Text(
+                    'Chain ID: 421614',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    'RPC: https://sepolia-rollup.arbitrum.io/rpc',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Please switch to Arbitrum Sepolia in your wallet or add it as a custom network.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _disconnectWallet(); // Disconnect if user doesn't want to switch
+            },
+            child: const Text(
+              'Disconnect',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _attemptNetworkSwitch();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              foregroundColor: AppTheme.textColor,
+            ),
+            child: const Text('Try Switch Network'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this method to attempt network switching
+  Future<void> _attemptNetworkSwitch() async {
+    try {
+      debugPrint('Attempting to switch to Arbitrum Sepolia...');
+      
+      // Try to switch using the wallet connection provider
+      final success = await ref.read(walletConnectionProvider.notifier).switchToArbitrumSepolia();
+      
+      if (success) {
+        _showSuccess('Successfully switched to Arbitrum Sepolia!');
+      } else {
+        // If automatic switch fails, show manual instructions
+        _showManualNetworkInstructions();
+      }
+    } catch (e) {
+      debugPrint('Error switching network: $e');
+      _showManualNetworkInstructions();
+    }
+  }
+
+  // Add this method to show manual network instructions
+  void _showManualNetworkInstructions() {
+    if (!mounted || _isDisposed) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        title: const Text(
+          'Add Network Manually',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textColor,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please add Arbitrum Sepolia manually to your wallet:',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _NetworkDetailRow('Network Name:', 'Arbitrum Sepolia'),
+                    _NetworkDetailRow('RPC URL:', 'https://sepolia-rollup.arbitrum.io/rpc'),
+                    _NetworkDetailRow('Chain ID:', '421614'),
+                    _NetworkDetailRow('Currency Symbol:', 'ETH'),
+                    _NetworkDetailRow('Explorer:', 'https://sepolia.arbiscan.io'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '1. Open your wallet settings\n2. Add Custom Network\n3. Enter the details above\n4. Save and switch to the network\n5. Come back and try connecting again',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text(
+              'I\'ll add it manually',
+              style: TextStyle(color: AppTheme.accentColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method to get chain name
+  String _getChainName(String chainId) {
+    switch (chainId) {
+      case '1':
+        return 'Ethereum Mainnet';
+      case '42161':
+        return 'Arbitrum One';
+      case '421614':
+        return 'Arbitrum Sepolia';
+      case '137':
+        return 'Polygon';
+      case '56':
+        return 'BNB Smart Chain';
+      case '43114':
+        return 'Avalanche';
+      default:
+        return 'Chain ID: $chainId';
+    }
+  }
+}
+
+// Helper widget for network details
+class _NetworkDetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _NetworkDetailRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textColor,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

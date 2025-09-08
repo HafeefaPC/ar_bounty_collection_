@@ -2,8 +2,8 @@
   "network": "arbitrumSepolia",
   "chainId": 421614,
   "contracts": {
-    "EventFactory": "0xf7bECe16CC3182C1890eC722cbd0E29aC61F888D",
-    "ClaimVerification": "0xf9c06Bf0C78E6738871BA2F2C2365244fbBB3046",
-    "BoundaryNFT": "0x1F2F71fa673a38CBC5848985A74713bDfB584578"
+    "EventFactory": "0x2f61d477F24C16dcDe68D988BDf6447b7D0Edb79",
+    "ClaimVerification": "0x070C20Fd90d2588C12f06c68f4a67def77e0aA6F",
+    "BoundaryNFT": "0xE587360Bc94a98E43F276718E49E213f7a30CA4B"
   }
 }

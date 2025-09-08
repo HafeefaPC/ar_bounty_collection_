@@ -192,6 +192,59 @@ async function main() {
     console.log("✅ ABI files created for Flutter app");
 
     // Step 8: Deployment Summary
+    // Step 8: Grant ORGANIZER_ROLE to common addresses (optional)
+    console.log("\n🔑 Step 8: Granting ORGANIZER_ROLE to common addresses...");
+    
+    // List of common addresses that should have ORGANIZER_ROLE
+    const commonOrganizers = [
+      // Add your common organizer addresses here
+      // "0x1234567890123456789012345678901234567890",
+      // "0x0987654321098765432109876543210987654321",
+    ];
+    
+    if (commonOrganizers.length > 0) {
+      try {
+        const grantTx = await eventFactory.grantOrganizerRoleToMultiple(commonOrganizers);
+        await grantTx.wait();
+        console.log("✅ ORGANIZER_ROLE granted to", commonOrganizers.length, "addresses");
+        console.log("   Transaction hash:", grantTx.hash);
+      } catch (grantError) {
+        console.log("⚠️  Failed to grant ORGANIZER_ROLE to common addresses:", grantError.message);
+      }
+    } else {
+      console.log("ℹ️  No common organizer addresses configured");
+    }
+    
+    // Verify that deployer has ORGANIZER_ROLE
+    const deployerHasRole = await eventFactory.hasOrganizerRole(deployer.address);
+    console.log("✅ Deployer has ORGANIZER_ROLE:", deployerHasRole);
+    
+    // Step 8.5: Test the new publicMintNFT function
+    console.log("\n🎨 Step 8.5: Testing publicMintNFT function...");
+    try {
+      // Test the public minting function
+      const testMintTx = await boundaryNFT.publicMintNFT(
+        "Test AR NFT",
+        "Test NFT for AR bounty collection",
+        "https://via.placeholder.com/300x300.png?text=Test+NFT",
+        "https://ar-bounty-collection.app/nft/test"
+      );
+      await testMintTx.wait();
+      
+      const tokenId = await boundaryNFT.getTotalSupply();
+      console.log("✅ publicMintNFT function works! Test NFT minted with ID:", tokenId.toString());
+      console.log("   Transaction hash:", testMintTx.hash);
+      
+      // Verify the NFT was minted to deployer
+      const owner = await boundaryNFT.ownerOf(tokenId);
+      console.log("✅ NFT owner:", owner);
+      console.log("✅ Deployer address:", deployer.address);
+      console.log("✅ Owner matches deployer:", owner.toLowerCase() === deployer.address.toLowerCase());
+      
+    } catch (testError) {
+      console.log("❌ publicMintNFT function test failed:", testError.message);
+    }
+
     console.log("\n🎉 === DEPLOYMENT SUCCESSFUL ===");
     console.log("Network:", network.name);
     console.log("Chain ID:", network.config.chainId);

@@ -25,6 +25,28 @@ class WalletService {
     await _loadWalletState();
   }
 
+  // Set ReownAppKit instance
+  void setReownAppKit(ReownAppKitModal appKitModal) {
+    _appKitModal = appKitModal;
+    debugPrint('ReownAppKit set in WalletService');
+    
+    // Update wallet state from ReownAppKit
+    if (appKitModal.isConnected && appKitModal.session != null) {
+      final session = appKitModal.session!;
+      final accounts = session.getAccounts();
+      if (accounts != null && accounts.isNotEmpty) {
+        // Extract address from the account string (format: eip155:chainId:address)
+        final account = accounts.first;
+        final parts = account.split(':');
+        if (parts.length >= 3) {
+          _connectedWalletAddress = parts[2];
+          _isConnected = true;
+          debugPrint('Wallet address updated from ReownAppKit: $_connectedWalletAddress');
+        }
+      }
+    }
+  }
+
   // Load wallet state from secure storage
   Future<void> _loadWalletState() async {
     try {

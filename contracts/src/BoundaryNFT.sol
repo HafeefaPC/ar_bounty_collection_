@@ -224,6 +224,55 @@ contract BoundaryNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
         emit LocationMerkleRootUpdated(tokenId, newMerkleRoot);
     }
     
+    // ===== PUBLIC MINTING FUNCTION (NEW) =====
+    
+    /**
+     * @dev Public function to mint NFT directly to user's wallet
+     * This allows users to claim NFTs without organizer role
+     * Added for AR bounty collection system
+     */
+    function publicMintNFT(
+        string calldata name,
+        string calldata description,
+        string calldata imageURI,
+        string calldata nftTokenURI
+    ) external nonReentrant returns (uint256) {
+        require(bytes(name).length > 0, "Name cannot be empty");
+        require(bytes(description).length > 0, "Description cannot be empty");
+        require(bytes(imageURI).length > 0, "Image URI cannot be empty");
+        require(bytes(nftTokenURI).length > 0, "NFT Token URI cannot be empty");
+        
+        _tokenIdCounter++;
+        uint256 tokenId = _tokenIdCounter;
+        
+        // Mint directly to the caller
+        _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, nftTokenURI);
+        
+        // Create metadata for public mint
+        nftMetadata[tokenId] = NFTMetadata({
+            eventId: 0, // No specific event for public mints
+            name: name,
+            description: description,
+            imageURI: imageURI,
+            latitude: 0,
+            longitude: 0,
+            radius: 0,
+            mintTimestamp: block.timestamp,
+            claimTimestamp: block.timestamp,
+            claimer: msg.sender,
+            merkleRoot: bytes32(0)
+        });
+        
+        // Add to user's tokens
+        userTokens[msg.sender].push(tokenId);
+        
+        emit BoundaryNFTMinted(tokenId, 0, msg.sender, name, 0, 0);
+        emit BoundaryNFTClaimed(tokenId, 0, msg.sender, block.timestamp, 0, 0);
+        
+        return tokenId;
+    }
+    
     function getEventTokens(uint256 eventId) external view returns (uint256[] memory) {
         return eventTokens[eventId];
     }

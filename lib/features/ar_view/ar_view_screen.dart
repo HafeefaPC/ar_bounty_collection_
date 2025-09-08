@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
@@ -9,11 +8,13 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/ar_service.dart';
+import '../../../shared/services/ar_nft_service.dart';
 import '../../../shared/services/supabase_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/models/event.dart';
 import '../../../shared/models/boundary.dart';
 import '../../../core/theme/retro_theme.dart';
+import '../../../shared/providers/reown_provider.dart';
 
 // AR Element class for positioning NFT images in 3D space
 class ARElement {
@@ -49,6 +50,7 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
   List<CameraDescription>? _cameras;
   
   late ARService arService;
+  late ARNFTService arNFTService;
   late SupabaseService supabaseService;
   late WalletService walletService;
 
@@ -74,8 +76,6 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
   final Map<String, Widget> _nftImageCache = {};
   final Map<String, DateTime> _imageCacheTimestamp = {};
   final Map<String, bool> _imageLoadErrors = {};
-  static const int _maxCacheSize = 50;
-  static const Duration _cacheExpiry = Duration(minutes: 10);
 
   // AR Positioning and Sensors
   double? _currentLatitude;
@@ -104,8 +104,23 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
 
   void _initializeServices() {
     arService = ARService();
+    arNFTService = ARNFTService();
     supabaseService = SupabaseService();
     walletService = WalletService();
+    
+    // Set wallet service in AR NFT service
+    arNFTService.setWalletService(walletService);
+    
+    // Initialize wallet service with ReownAppKit
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final reownAppKit = ref.read(reownAppKitProvider);
+      if (reownAppKit != null) {
+        walletService.setReownAppKit(reownAppKit);
+        print('✅ AR View: ReownAppKit set in wallet service');
+      } else {
+        print('❌ AR View: ReownAppKit is null');
+      }
+    });
   }
 
   void _setupAnimations() {
@@ -182,19 +197,36 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
 
   void _updateARPositions() {
     if (_currentLatitude == null || _currentLongitude == null || boundaries.isEmpty) {
+      print('🔍 AR Update: Missing position or boundaries');
+      print('  - Latitude: $_currentLatitude');
+      print('  - Longitude: $_currentLongitude');
+      print('  - Boundaries count: ${boundaries.length}');
       return;
     }
+
+    print('🔍 AR Update: Updating positions...');
+    print('  - Current position: $_currentLatitude, $_currentLongitude');
+    print('  - Total boundaries: ${boundaries.length}');
+    print('  - Claimed boundaries: ${boundaries.where((b) => b.isClaimed).length}');
+    print('  - Unclaimed boundaries: ${boundaries.where((b) => !b.isClaimed).length}');
 
     List<ARElement> newElements = [];
     
     for (Boundary boundary in boundaries) {
       // Skip if already claimed by anyone
-      if (boundary.isClaimed) continue;
+      if (boundary.isClaimed) {
+        print('🔍 Skipping claimed boundary: ${boundary.name}');
+        continue;
+      }
       
       double distance = boundary.distanceFrom(_currentLatitude!, _currentLongitude!);
+      print('🔍 Boundary ${boundary.name}: distance=${distance.toStringAsFixed(1)}m, radius=${boundary.radius}m');
       
       // Only show boundaries within detection range
-      if (distance > 10.0) continue;
+      if (distance > 10.0) {
+        print('🔍 Boundary ${boundary.name}: Too far (${distance.toStringAsFixed(1)}m > 10m)');
+        continue;
+      }
       
       // Calculate bearing and relative angle
       double bearing = _calculateBearing(
@@ -207,25 +239,29 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
       while (relativeAngle > 180) relativeAngle -= 360;
       while (relativeAngle < -180) relativeAngle += 360;
       
-      // Only show if within field of view
-      if (relativeAngle.abs() > 90) continue;
+      // Only show if within field of view (increased from 90 to 120 degrees)
+      if (relativeAngle.abs() > 120) {
+        print('🔍 Boundary ${boundary.name}: Outside field of view (${relativeAngle.toStringAsFixed(1)}°)');
+        continue;
+      }
       
-      // Calculate screen coordinates
+      // Calculate screen coordinates with better positioning
       double screenWidth = MediaQuery.of(context).size.width;
       double screenHeight = MediaQuery.of(context).size.height;
       
-      double screenX = screenWidth / 2 + (relativeAngle * screenWidth / 180);
-      double screenY = screenHeight * 0.4 + (distance * 15);
+      // More accurate screen positioning
+      double screenX = screenWidth / 2 + (relativeAngle * screenWidth / 240); // Wider spread
+      double screenY = screenHeight * 0.35 + (distance * 12); // Closer positioning
       
-      // Add some variation for natural positioning
-      screenX += (Random().nextDouble() - 0.5) * 30;
-      screenY += (Random().nextDouble() - 0.5) * 20;
+      // Add subtle variation for natural positioning (reduced randomness)
+      screenX += (Random().nextDouble() - 0.5) * 20;
+      screenY += (Random().nextDouble() - 0.5) * 15;
       
-      // Clamp to screen bounds
-      screenX = screenX.clamp(80.0, screenWidth - 80.0);
-      screenY = screenY.clamp(180.0, screenHeight - 280.0);
+      // Clamp to screen bounds with better margins
+      screenX = screenX.clamp(60.0, screenWidth - 60.0);
+      screenY = screenY.clamp(150.0, screenHeight - 250.0);
       
-      bool isClaimable = distance <= (boundary.radius ?? 2.0);
+      bool isClaimable = distance <= boundary.radius;
       bool isVisible = distance <= 15.0;
       
       print('Boundary ${boundary.name}: distance=$distance, radius=${boundary.radius}, isClaimable=$isClaimable');
@@ -242,6 +278,19 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
     
     setState(() {
       arElements = newElements;
+      
+      // Update progress display
+      final totalUnclaimed = boundaries.where((b) => !b.isClaimed).length;
+      final visibleCount = newElements.length;
+      final claimableCount = newElements.where((e) => e.isClaimable).length;
+      
+      print('🔍 AR State Update:');
+      print('  - Total boundaries: ${boundaries.length}');
+      print('  - Claimed: $claimedCount');
+      print('  - Unclaimed: $totalUnclaimed');
+      print('  - Visible in AR: $visibleCount');
+      print('  - Claimable: $claimableCount');
+      
       if (arElements.isNotEmpty) {
         final closest = arElements.reduce((a, b) => a.distance < b.distance ? a : b);
         if (closest.isClaimable) {
@@ -251,7 +300,12 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
           proximityHint = "▸ SCANNING... ${closest.distance.toStringAsFixed(1)}M TO TARGET";
         }
       } else {
-        proximityHint = "▸ NO TARGETS IN RANGE - KEEP EXPLORING";
+        if (totalUnclaimed == 0) {
+          proximityHint = "▸ ALL TARGETS CLAIMED! 🎉";
+        } else {
+          proximityHint = "▸ NO TARGETS IN RANGE - KEEP EXPLORING";
+        }
+        detectedBoundary = null;
       }
     });
   }
@@ -327,6 +381,7 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
         // Load claimed boundaries for this event
         await _loadClaimedBoundaries();
         
+        // Initialize both services
         await arService.setEvent(currentEvent!);
         arService.onBoundaryDetected = _onBoundaryDetected;
         arService.onBoundaryClaimed = _onBoundaryClaimed;
@@ -337,6 +392,19 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
         arService.onPositionUpdate = _onPositionUpdate;
         
         await arService.initializeAR();
+        
+        // Initialize AR NFT service
+        await arNFTService.initialize();
+        await arNFTService.setEvent(currentEvent!);
+        arNFTService.onBoundaryDetected = _onBoundaryDetected;
+        arNFTService.onBoundaryClaimed = _onBoundaryClaimed;
+        arNFTService.onProximityUpdate = _onProximityUpdate;
+        arNFTService.onProgressUpdate = _onProgressUpdate;
+        arNFTService.onVisibleBoundariesUpdate = _onVisibleBoundariesUpdate;
+        arNFTService.onClaimedBoundariesUpdate = _onClaimedBoundariesUpdate;
+        arNFTService.onPositionUpdate = _onPositionUpdate;
+        arNFTService.onNFTMinted = _onNFTMinted;
+        arNFTService.onClaimSubmitted = _onClaimSubmitted;
         
         setState(() {
           isLoading = false;
@@ -450,9 +518,65 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
     _updateARPositions();
   }
 
+  void _onNFTMinted(String txHash) {
+    if (!mounted) return;
+    print('🎨 NFT minted successfully: $txHash');
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: RetroTheme.darkGreen,
+            border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+          ),
+          child: Text(
+            'NFT MINTED! TX: ${txHash.substring(0, 10)}...',
+            style: TextStyle(
+              fontFamily: 'Courier',
+              color: RetroTheme.brightGreen,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _onClaimSubmitted(String txHash) {
+    if (!mounted) return;
+    print('📍 Location claim submitted: $txHash');
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: RetroTheme.darkGreen,
+            border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+          ),
+          child: Text(
+            'CLAIM SUBMITTED! TX: ${txHash.substring(0, 10)}...',
+            style: TextStyle(
+              fontFamily: 'Courier',
+              color: RetroTheme.brightGreen,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _claimBoundary(ARElement element) async {
     try {
-      print('=== CLAIMING BOUNDARY ===');
+      print('=== CLAIMING BOUNDARY WITH NFT MINTING ===');
       print('Boundary ID: ${element.boundary.id}');
       print('Boundary Name: ${element.boundary.name}');
       print('Is Claimable: ${element.isClaimable}');
@@ -460,43 +584,41 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
       print('Current claimed count: $claimedCount');
       
       setState(() {
-        proximityHint = "▸ CLAIMING BOUNDARY...";
+        proximityHint = "▸ CLAIMING BOUNDARY & MINTING NFT...";
       });
 
-      final walletAddress = walletService.connectedWalletAddress ?? 'demo_wallet_${DateTime.now().millisecondsSinceEpoch}';
-      print('Using wallet address: $walletAddress');
+      // Check wallet connection first
+      print('🔍 Checking wallet connection...');
+      final walletAddress = walletService.connectedWalletAddress;
+      print('🔍 Wallet address: $walletAddress');
+      print('🔍 Wallet connected: ${walletService.isConnected}');
+      print('🔍 AppKit available: ${walletService.appKitModal != null}');
       
-      // Enhanced claim with all necessary database updates
-      print('Calling claimBoundaryWithFullUpdate...');
-      final success = await supabaseService.claimBoundaryWithFullUpdate(
-        boundaryId: element.boundary.id,
-        claimedBy: walletAddress,
-        distance: element.distance,
-        claimTxHash: 'tx_${DateTime.now().millisecondsSinceEpoch}', // Would be real tx hash
-        nftMetadata: {
-          'name': element.boundary.name,
-          'description': element.boundary.description,
-          'image': element.boundary.imageUrl,
-          'claimed_at': DateTime.now().toIso8601String(),
-          'location': {
-            'lat': element.boundary.latitude,
-            'lng': element.boundary.longitude,
-          },
-          'event': currentEvent?.name,
-        },
-      );
+      if (walletAddress == null) {
+        print('❌ No wallet connected, cannot claim NFT');
+        setState(() {
+          proximityHint = "▸ ERROR: NO WALLET CONNECTED";
+        });
+        return;
+      }
+
+      // Use the new AR NFT service for blockchain integration
+      print('Using AR NFT Service for blockchain claim...');
+      final success = await arNFTService.claimBoundary(element.boundary);
       
-      print('Claim result: $success');
+      print('AR NFT Service claim result: $success');
       
       if (success) {
-        print('Claim successful, updating local state...');
+        print('NFT claim successful, updating local state...');
+        
         // Update local state
         final updatedBoundary = element.boundary.copyWith(
           isClaimed: true,
-          claimedBy: walletAddress,
+          claimedBy: walletService.connectedWalletAddress ?? 'demo_wallet',
           claimedAt: DateTime.now(),
         );
         
+        // Update both services
         arService.claimBoundary(updatedBoundary);
         
         setState(() {
@@ -510,8 +632,13 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
         
         print('Local state updated, claimed count: $claimedCount');
         _updateARPositions();
+        
+        // Show success with confetti
+        confettiController.play();
+        _showRetroClaimSuccessDialog(updatedBoundary);
+        
       } else {
-        print('Claim failed - already claimed or other error');
+        print('NFT claim failed - already claimed or other error');
         setState(() {
           proximityHint = "▸ CLAIM FAILED - ALREADY CLAIMED";
         });
@@ -520,7 +647,7 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
         await _loadEventData();
       }
     } catch (e) {
-      print('Error claiming boundary: $e');
+      print('Error claiming boundary with NFT: $e');
       print('Error type: ${e.runtimeType}');
       print('Full error details: ${e.toString()}');
       setState(() {
@@ -800,190 +927,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
   }
 
 
-void _testSingleImageLoad() async {
-  if (currentEvent == null || currentEvent!.boundaries.isEmpty) {
-    print('No boundaries to test');
-    return;
-  }
-  
-  final testBoundary = currentEvent!.boundaries.first;
-  final testUrl = testBoundary.imageUrl;
-  
-  print('=== TESTING SINGLE IMAGE LOAD ===');
-  print('Test URL: $testUrl');
-  
-  // Test in a simple widget
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      child: Container(
-        width: 200,
-        height: 200,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text('Testing Image Load'),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.green, width: 2),
-                ),
-                child: Image.network(
-                  testUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) {
-                      print('TEST IMAGE LOADED SUCCESSFULLY');
-                      return child;
-                    }
-                    return const Center(child: CircularProgressIndicator());
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    print('TEST IMAGE ERROR: $error');
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error, color: Colors.red),
-                          Text('Error: $error'),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
 
-// Add the SHOW ALL button method:
-void _showAllImagesTest() {
-  if (currentEvent == null || currentEvent!.boundaries.isEmpty) {
-    print('No boundaries to test');
-    return;
-  }
-  
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: RetroTheme.primaryGreen,
-          border: Border.all(color: RetroTheme.brightGreen, width: 3),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: RetroTheme.darkGreen,
-            border: Border.all(color: RetroTheme.primaryGreen, width: 2),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: RetroTheme.brightGreen,
-                  border: Border(
-                    bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
-                  ),
-                ),
-                child: Text(
-                  '>>> ALL IMAGES TEST <<<',
-                  style: TextStyle(
-                    fontFamily: 'Courier',
-                    color: RetroTheme.darkGreen,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: currentEvent!.boundaries.length,
-                  itemBuilder: (context, index) {
-                    final boundary = currentEvent!.boundaries[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
-                        color: RetroTheme.primaryGreen,
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            color: RetroTheme.brightGreen,
-                            child: Text(
-                              boundary.name.toUpperCase(),
-                              style: TextStyle(
-                                fontFamily: 'Courier',
-                                color: RetroTheme.darkGreen,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildPixelatedNFTImage(boundary.imageUrl),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: RetroTheme.primaryGreen,
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '[ CLOSE ]',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
 
 // And update your _buildImageWithRetry method:
 Widget _buildImageWithRetry(String imageUrl) {
@@ -1522,14 +1466,29 @@ Widget _buildImageWithRetry(String imageUrl) {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        '${claimedCount.clamp(0, totalBoundaries)}/$totalBoundaries',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          color: RetroTheme.lightGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${claimedCount.clamp(0, totalBoundaries)}/$totalBoundaries',
+                            style: TextStyle(
+                              fontFamily: 'Courier',
+                              color: RetroTheme.lightGreen,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (arElements.isNotEmpty)
+                            Text(
+                              '${arElements.where((e) => e.isClaimable).length} CLAIMABLE',
+                              style: TextStyle(
+                                fontFamily: 'Courier',
+                                color: RetroTheme.brightGreen,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -2373,7 +2332,7 @@ Widget _buildImageWithRetry(String imageUrl) {
 
   @override
   void dispose() {
-    arService.onBoundaryDetected = null;
+    // Clean up AR Service
     arService.onBoundaryDetected = null;
     arService.onBoundaryClaimed = null;
     arService.onProximityUpdate = null;
@@ -2381,6 +2340,17 @@ Widget _buildImageWithRetry(String imageUrl) {
     arService.onVisibleBoundariesUpdate = null;
     arService.onClaimedBoundariesUpdate = null;
     arService.onPositionUpdate = null;
+    
+    // Clean up AR NFT Service
+    arNFTService.onBoundaryDetected = null;
+    arNFTService.onBoundaryClaimed = null;
+    arNFTService.onProximityUpdate = null;
+    arNFTService.onProgressUpdate = null;
+    arNFTService.onVisibleBoundariesUpdate = null;
+    arNFTService.onClaimedBoundariesUpdate = null;
+    arNFTService.onPositionUpdate = null;
+    arNFTService.onNFTMinted = null;
+    arNFTService.onClaimSubmitted = null;
     
     _arUpdateTimer?.cancel();
     _gyroscopeSubscription?.cancel();
@@ -2395,6 +2365,7 @@ Widget _buildImageWithRetry(String imageUrl) {
     _imageCacheTimestamp.clear();
     
     arService.dispose();
+    arNFTService.dispose();
     super.dispose();
   }
 }

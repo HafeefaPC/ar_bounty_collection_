@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:face_reflector/core/routing/app_router.dart';
 import 'package:face_reflector/core/providers/providers.dart';
 import 'package:face_reflector/shared/providers/reown_provider.dart';
@@ -33,6 +35,7 @@ void main() async {
     print('Error initializing Supabase in main: $e');
   }
   
+  
   // Initialize providers
   initializeProviders();
   
@@ -54,7 +57,10 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
   @override
   void initState() {
     super.initState();
-    _initializeServices();
+    // Initialize services after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeServices();
+    });
   }
 
   Future<void> _initializeServices() async {
@@ -63,11 +69,9 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
       final globalWalletService = ref.read(globalWalletServiceProvider);
       await globalWalletService.initialize(ref);
       
-      // Initialize ReownAppKit
-      await ref.read(reownAppKitProvider.notifier).initialize(context);
-      print('ReownAppKit initialized successfully in main app');
+      debugPrint('Services initialized successfully');
     } catch (e) {
-      print('Error initializing services in main app: $e');
+      debugPrint('Error initializing services: $e');
     }
   }
 
@@ -75,61 +79,60 @@ class _FaceReflectorAppState extends ConsumerState<FaceReflectorApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     
-            return Localizations(
-          locale: const Locale('en', 'US'),
-          delegates: const [
-            DefaultMaterialLocalizations.delegate,
-            DefaultWidgetsLocalizations.delegate,
-          ],
-          child: MaterialApp.router(
-            title: 'TOKON',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              useMaterial3: true,
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: AppTheme.primaryColor,
-                brightness: Brightness.dark,
-                primary: AppTheme.primaryColor,
-                secondary: AppTheme.secondaryColor,
-                surface: AppTheme.surfaceColor,
-                background: AppTheme.backgroundColor,
-                onPrimary: AppTheme.textColor,
-                onSecondary: AppTheme.textColor,
-                onSurface: AppTheme.textColor,
-                onBackground: AppTheme.textColor,
-              ),
-              scaffoldBackgroundColor: AppTheme.backgroundColor,
-              appBarTheme: AppTheme.modernAppBarTheme,
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: AppTheme.modernPrimaryButton,
-              ),
-              outlinedButtonTheme: OutlinedButtonThemeData(
-                style: AppTheme.modernOutlinedButton,
-              ),
-              textButtonTheme: TextButtonThemeData(
-                style: AppTheme.modernTextButton,
-              ),
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              ),
-            ),
-            routerConfig: router,
-            locale: const Locale('en', 'US'),
+    return MaterialApp.router(
+      title: 'TOKON',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppTheme.primaryColor,
+          brightness: Brightness.dark,
+          primary: AppTheme.primaryColor,
+          secondary: AppTheme.secondaryColor,
+          surface: AppTheme.surfaceColor,
+          onPrimary: AppTheme.textColor,
+          onSecondary: AppTheme.textColor,
+          onSurface: AppTheme.textColor,
+        ),
+        scaffoldBackgroundColor: AppTheme.backgroundColor,
+        appBarTheme: AppTheme.modernAppBarTheme,
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: AppTheme.modernPrimaryButton,
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: AppTheme.modernOutlinedButton,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: AppTheme.modernTextButton,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppTheme.cardColor,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
           ),
-        );
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+      ),
+      routerConfig: router,
+      locale: const Locale('en', 'US'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+      ],
+    );
   }
 }

@@ -242,4 +242,16 @@ contract EventFactory is Ownable, AccessControl, ReentrancyGuard {
     function revokeOrganizerRole(address account) external onlyOwner {
         _revokeRole(ORGANIZER_ROLE, account);
     }
+    
+    // Grant ORGANIZER_ROLE to multiple addresses at once
+    function grantOrganizerRoleToMultiple(address[] calldata accounts) external onlyOwner {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            _grantRole(ORGANIZER_ROLE, accounts[i]);
+        }
+    }
+    
+    // Check if an address has ORGANIZER_ROLE
+    function hasOrganizerRole(address account) external view returns (bool) {
+        return hasRole(ORGANIZER_ROLE, account);
+    }
 }

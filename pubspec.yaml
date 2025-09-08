@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # State Management
   flutter_riverpod: ^2.5.1
@@ -62,10 +64,12 @@ dependencies:
   mime: ^1.0.4
   pinenacl: ^0.6.0
   
-  # Reown AppKit (WalletConnect Web3 Wallet)
+  
+  # Keep Reown as fallback
   reown_appkit: ^1.6.0
   url_launcher: ^6.2.5
   flutter_secure_storage: ^9.0.0
+  
   
   # Wallet Connect for Core Mobile Integration
   # Note: Using mock service for development. Real WalletConnect packages will be added when available.
@@ -110,6 +114,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   build_runner: ^2.4.13
   flutter_launcher_icons: ^0.13.1
+
 
 flutter_launcher_icons:
   android: "launcher_icon"

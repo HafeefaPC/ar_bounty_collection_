@@ -223,11 +223,13 @@ class _WalletConnectionWrapperState extends ConsumerState<WalletConnectionWrappe
 class WalletConnectionStatus extends ConsumerWidget {
   final bool showAddress;
   final bool showDisconnectButton;
+  final bool showNetworkSwitch;
 
   const WalletConnectionStatus({
     super.key,
     this.showAddress = true,
     this.showDisconnectButton = false,
+    this.showNetworkSwitch = true,
   });
 
   @override
@@ -238,9 +240,9 @@ class WalletConnectionStatus extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-                border: Border.all(color: walletState.isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.3)),
-                borderRadius: BorderRadius.circular(12),
-              ),
+        border: Border.all(color: walletState.isConnected ? AppTheme.successColor : AppTheme.textColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -274,9 +276,143 @@ class WalletConnectionStatus extends ConsumerWidget {
                     fontFamily: 'Courier',
                   ),
                 ),
+                // Add chain ID display
+                if (walletState.chainId != null) ...[
+                  const SizedBox(height: 2),
+                  Builder(
+                    builder: (context) {
+                      // Extract chain ID without eip155: prefix for comparison
+                      final chainId = walletState.chainId!.replaceAll('eip155:', '');
+                      final isArbitrumSepolia = chainId == '421614';
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isArbitrumSepolia 
+                              ? AppTheme.successColor.withOpacity(0.2)
+                              : AppTheme.warningColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isArbitrumSepolia 
+                                ? AppTheme.successColor.withOpacity(0.5)
+                                : AppTheme.warningColor.withOpacity(0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _getChainName(chainId),
+                          style: AppTheme.modernBodySecondary.copyWith(
+                            color: isArbitrumSepolia 
+                                ? AppTheme.successColor
+                                : AppTheme.warningColor,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ],
           ),
+          // Network switch button
+          if (showNetworkSwitch && walletState.isConnected) ...[
+            Builder(
+              builder: (context) {
+                // Extract chain ID without eip155: prefix for comparison
+                final chainId = walletState.chainId?.replaceAll('eip155:', '') ?? '';
+                final isArbitrumSepolia = chainId == '421614';
+                
+                if (isArbitrumSepolia) {
+                  return const SizedBox.shrink(); // Don't show switch button if already on correct network
+                }
+                
+                return Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () async {
+                        try {
+                          // Show loading indicator
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Switching to Arbitrum Sepolia...',
+                                      style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
+                                    ),
+                                  ],
+                                ),
+                                backgroundColor: AppTheme.primaryColor,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                          
+                          // Attempt to switch network
+                          final success = await walletNotifier.switchToArbitrumSepolia();
+                          
+                          // Wait for state to update
+                          await Future.delayed(const Duration(seconds: 2));
+                          
+                          // Force refresh the wallet state
+                          walletNotifier.refreshConnectionState();
+                          
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(success ? 'Successfully switched to Arbitrum Sepolia!' : 'Failed to switch network. Please try manually.'),
+                                backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error switching network: $e'),
+                                backgroundColor: AppTheme.errorColor,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppTheme.warningColor.withOpacity(0.5)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.swap_horiz,
+                          color: AppTheme.warningColor,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+          // Disconnect button
           if (showDisconnectButton && walletState.isConnected) ...[
             const SizedBox(width: 8),
             GestureDetector(
@@ -302,9 +438,9 @@ class WalletConnectionStatus extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Icon(
                   Icons.logout,
                   color: AppTheme.textColor.withOpacity(0.7),
@@ -317,5 +453,24 @@ class WalletConnectionStatus extends ConsumerWidget {
       ),
     );
   }
+  
+  // Helper method to get chain name from chain ID
+  String _getChainName(String chainId) {
+    switch (chainId) {
+      case '1':
+        return 'ETH Mainnet';
+      case '42161':
+        return 'Arbitrum One';
+      case '421614':
+        return 'Arbitrum Sepolia';
+      case '137':
+        return 'Polygon';
+      case '56':
+        return 'BNB Chain';
+      case '43114':
+        return 'Avalanche';
+      default:
+        return 'Chain $chainId';
+    }
+  }
 }
-
