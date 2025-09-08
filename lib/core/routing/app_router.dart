@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:face_reflector/features/splash/splash_screen.dart';
 import 'package:face_reflector/features/wallet/wallet_connection_screen.dart';
 import 'package:face_reflector/features/wallet/wallet_options_screen.dart';
-import 'package:face_reflector/features/wallet/boundary_history_screen.dart';
 import 'package:face_reflector/features/event_joining/event_join_screen.dart';
-import 'package:face_reflector/features/ar_view/ar_view_screen.dart';
+
 import 'package:face_reflector/features/event_creation/event_creation_screen.dart';
+import 'package:face_reflector/features/nft_collection/nft_viewer_screen.dart';
 
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -63,15 +63,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
       
-      // AR View
-      GoRoute(
-        path: '/ar-view',
-        name: 'ar-view',
-        builder: (context, state) {
-          final eventCode = state.uri.queryParameters['eventCode'];
-          return RetroARViewScreen(eventCode: eventCode ?? '');
-        },
-      ),
+     
       
       // Create Event Flow
       GoRoute(
@@ -87,11 +79,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => '/wallet/options',
       ),
       
-      // Boundary History
+      
+      // NFT Collection Viewer
       GoRoute(
-        path: '/boundary-history',
-        name: 'boundary-history',
-        builder: (context, state) => const BoundaryHistoryScreen(),
+        path: '/nft-collection',
+        name: 'nft-collection',
+        builder: (context, state) => const NFTViewerScreen(),
       ),
       
       // Debug route to catch all unmatched routes

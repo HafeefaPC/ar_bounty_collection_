@@ -341,16 +341,17 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         
         SizedBox(height: screenHeight * 0.025),
         
-        // Boundary History Option
+        // NFT Collection Option
         _buildModernAnimatedOptionCard(
-          icon: Icons.history_rounded,
-          title: 'My Boundary Collection',
-          subtitle: 'View all your claimed boundaries from different events',
-          onTap: () => context.go('/boundary-history'),
+          icon: Icons.collections_rounded,
+          title: 'Network NFT Collection',
+          subtitle: 'View all claimed NFTs from events across the network',
+          onTap: () => context.go('/nft-collection'),
           screenWidth: screenWidth,
           screenHeight: screenHeight,
           delay: 900.ms,
         ),
+        
       ],
     );
   }
@@ -444,7 +445,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         ),
       ).animate().fadeIn(
         duration: 600.ms,
-        delay: 1100.ms,
+        delay: 1300.ms,
       );
     } else {
       return SizedBox(
@@ -476,7 +477,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
         ),
       ).animate().fadeIn(
         duration: 600.ms,
-        delay: 1100.ms,
+        delay: 1300.ms,
       );
     }
   }
