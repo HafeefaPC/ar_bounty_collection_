@@ -75,7 +75,7 @@ Widget build(BuildContext context) {
                         ),
                       ),
                       child: IconButton(
-                        onPressed: () => context.go('/wallet/options'),
+                        onPressed: () => context.go('/main'),
                         icon: Icon(Icons.arrow_back_ios, color: AppTheme.textColor),
                         style: IconButton.styleFrom(
                           backgroundColor: AppTheme.surfaceColor,
@@ -387,9 +387,12 @@ Widget build(BuildContext context) {
     try {
       final eventCode = _eventCodeController.text.trim().toUpperCase();
       final event = await ref.read(eventByCodeProvider(eventCode).future);
-      if (event != null) {
-        ref.read(currentEventProvider.notifier).setEvent(event);
+      
+      if (event == null) {
+        throw Exception('Event not found with code: $eventCode');
       }
+      
+      ref.read(currentEventProvider.notifier).setEvent(event);
       
       if (mounted) {
         context.go('/ar-view?eventCode=$eventCode');

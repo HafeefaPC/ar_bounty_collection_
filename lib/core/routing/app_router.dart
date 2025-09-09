@@ -9,6 +9,8 @@ import 'package:face_reflector/features/event_joining/event_join_screen.dart';
 
 import 'package:face_reflector/features/event_creation/event_creation_screen.dart';
 import 'package:face_reflector/features/nft_collection/nft_viewer_screen.dart';
+import 'package:face_reflector/features/ar_view/ar_view_screen.dart';
+import 'package:face_reflector/features/main/main_screen.dart';
 
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -34,6 +36,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/wallet/options',
         name: 'wallet-options',
         builder: (context, state) => const WalletOptionsScreen(),
+      ),
+      
+      // Main Screen
+      GoRoute(
+        path: '/main',
+        name: 'main',
+        builder: (context, state) => const MainScreen(),
       ),
       
       // Join Event Flow (without code)
@@ -72,11 +81,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const EventCreationScreen(),
       ),
       
-      // Events Overview (redirects to wallet options for now)
+      // Events Overview (redirects to main for now)
       GoRoute(
         path: '/events',
         name: 'events',
-        redirect: (context, state) => '/wallet/options',
+        redirect: (context, state) => '/main',
       ),
       
       
@@ -85,6 +94,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/nft-collection',
         name: 'nft-collection',
         builder: (context, state) => const NFTViewerScreen(),
+      ),
+      
+      // AR View Screen
+      GoRoute(
+        path: '/ar-view',
+        name: 'ar-view',
+        builder: (context, state) {
+          final eventCode = state.uri.queryParameters['eventCode'];
+          print('Router: Navigating to /ar-view with eventCode: $eventCode');
+          return RetroARViewScreen(eventCode: eventCode ?? '');
+        },
       ),
       
       // Debug route to catch all unmatched routes
@@ -107,8 +127,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   Text('Route not found: $path'),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () => context.go('/wallet/options'),
-                    child: Text('Go to Wallet Options'),
+                    onPressed: () => context.go('/main'),
+                    child: Text('Go to Main'),
                   ),
                 ],
               ),
