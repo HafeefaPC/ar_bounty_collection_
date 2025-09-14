@@ -1,0 +1,23 @@
+{
+  "network": "somniaTestnet",
+  "deployer": "0x1570a891556eF3A181658EaD5AA409B21C7Cd42d",
+  "balance": "0.351135096",
+  "gasPrice": "6.0 gwei",
+  "estimates": {
+    "BoundaryNFT": {
+      "gas": "93898614",
+      "cost": "0.563391684 STT",
+      "canAfford": false
+    },
+    "ClaimVerification": {
+      "gas": "42640665",
+      "cost": "0.25584399 STT",
+      "canAfford": true
+    }
+  },
+  "contracts": {
+    "EventFactory": "0x1F2F71fa673a38CBC5848985A74713bDfB584578",
+    "BoundaryNFT": "PENDING",
+    "ClaimVerification": "PENDING"
+  }
+}

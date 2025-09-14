@@ -105,7 +105,7 @@ Widget build(BuildContext context) {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
+                        color: AppTheme.primaryColor,
                         borderRadius: BorderRadius.circular(0), // Pixelated
                         border: Border.all(
                           color: AppTheme.textColor,
@@ -304,38 +304,7 @@ Widget build(BuildContext context) {
                           
                           const SizedBox(height: 24),
                           
-                          // Demo Event Button
-                          if (widget.initialEventCode == null) // Only show if no initial event code
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: _isLoading ? null : _joinDemoEvent,
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  side: BorderSide(color: AppTheme.secondaryColor, width: 2),
-                                  backgroundColor: Colors.transparent,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.sports_esports,
-                                      color: AppTheme.secondaryColor,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'TRY DEMO EVENT (TECH24)',
-                                      style: AppTheme.modernButton.copyWith(
-                                        color: AppTheme.secondaryColor,
-                                        fontSize: 14,
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ).animate().fadeIn(delay: 1000.ms).slideY(begin: 0.3),
+                          
                         ],
                       ),
                     ),
@@ -347,28 +316,7 @@ Widget build(BuildContext context) {
             ),
             
             // Retro Footer
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(0), // Pixelated
-                  border: Border.all(
-                    color: AppTheme.accentColor,
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  'Make sure you\'re at the event venue to claim goodies',
-                  textAlign: TextAlign.center,
-                  style: AppTheme.modernBodySecondary.copyWith(
-                    fontSize: 12,
-                    color: AppTheme.textColor.withOpacity(0.7),
-                  ),
-                ),
-              ).animate().fadeIn(delay: 1200.ms),
-            ),
+            
           ],
         ),
       ),

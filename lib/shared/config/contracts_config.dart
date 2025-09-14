@@ -1,55 +1,33 @@
 class ContractsConfig {
-  // Contract addresses for Arbitrum Sepolia testnet (UPDATED - Latest Deployment)
-  static const Map<String, String> arbitrumSepoliaContracts = {
-    'EventFactory': '0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d',
-    'BoundaryNFT': '0xC585B8e492210FbEDbFE8BB353366DC968c9F77A',
-    'ClaimVerification': '0xed4468D5f1247dfD6BD19Dd54BD91278B647d6Aa',
+  // Contract addresses for Somnia Testnet (UPDATED - Latest Deployment)
+  static const Map<String, String> somniaTestnetContracts = {
+    'EventFactory': '0x1F2F71fa673a38CBC5848985A74713bDfB584578', // ✅ DEPLOYED
+    'BoundaryNFT': '0x0000000000000000000000000000000000000000', // ⏳ PENDING - Not deployed yet
+    'ClaimVerification': '0x80FF10046dc3082A6925F04DE51102ebFB3f9EC6', // ✅ DEPLOYED
   };
 
-  // Contract addresses for Avalanche Fuji testnet (legacy)
-  static const Map<String, String> fujiContracts = {
-    'EventFactory': '0x1234567890123456789012345678901234567890',
-    'BoundaryNFT': '0x2345678901234567890123456789012345678901',
-    'ClaimVerification': '0x3456789012345678901234567890123456789012',
-  };
+  // Contract addresses for somnia testnet (legacy)
 
-  // Contract addresses for Avalanche mainnet (for future use)
-  static const Map<String, String> avalancheContracts = {
-    'EventFactory': '0x0000000000000000000000000000000000000000',
-    'BoundaryNFT': '0x0000000000000000000000000000000000000000',
-    'ClaimVerification': '0x0000000000000000000000000000000000000000',
-  };
+
+
 
   // Network configurations
   static const Map<String, Map<String, dynamic>> networkConfigs = {
-    'arbitrumSepolia': {
-      'name': 'Arbitrum Sepolia Testnet',
-      'chainId': 421614,
-      'rpcUrl': 'https://sepolia-rollup.arbitrum.io/rpc',
-      'nativeCurrency': 'ETH',
-      'blockExplorer': 'https://sepolia.arbiscan.io',
-      'contracts': arbitrumSepoliaContracts,
+    'somniaTestnet': {
+      'name': 'Somnia Testnet',
+      'chainId': 50312,
+      'rpcUrl': 'https://dream-rpc.somnia.network',
+      'nativeCurrency': 'STT',
+      'blockExplorer': 'https://shannon-explorer.somnia.network',
+      'contracts': somniaTestnetContracts,
     },
-    'fuji': {
-      'name': 'Avalanche Fuji Testnet',
-      'chainId': 43113,
-      'rpcUrl': 'https://api.avax-test.network/ext/bc/C/rpc',
-      'nativeCurrency': 'AVAX',
-      'blockExplorer': 'https://testnet.snowtrace.io',
-      'contracts': fujiContracts,
-    },
-    'avalanche': {
-      'name': 'Avalanche Mainnet',
-      'chainId': 43114,
-      'rpcUrl': 'https://api.avax.network/ext/bc/C/rpc',
-      'nativeCurrency': 'AVAX',
-      'blockExplorer': 'https://snowtrace.io',
-      'contracts': avalancheContracts,
-    },
+    
+   
+   
   };
 
   // Default network
-  static const String defaultNetwork = 'arbitrumSepolia';
+  static const String defaultNetwork = 'somniaTestnet';
 
   // Get contract addresses for a specific network
   static Map<String, String> getContracts(String network) {

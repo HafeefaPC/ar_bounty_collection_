@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:face_reflector/core/routing/app_router.dart';
 import 'package:face_reflector/core/providers/providers.dart';
-import 'package:face_reflector/shared/providers/reown_provider.dart';
 import 'package:face_reflector/shared/services/global_wallet_service.dart';
 import 'package:face_reflector/core/theme/app_theme.dart';
 

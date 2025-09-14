@@ -11,13 +11,13 @@ class NFTService {
   factory NFTService() => _instance;
   NFTService._internal();
 
-  // Contract addresses on Arbitrum Sepolia Testnet
-  static const String _boundaryNFTAddress = "0xE587360Bc94a98E43F276718E49E213f7a30CA4B";
-  static const String _eventFactoryAddress = "0x2f61d477F24C16dcDe68D988BDf6447b7D0Edb79";
+  // Contract addresses on Somnia Testnet (to be deployed)
+  static const String _boundaryNFTAddress = "0x8C62160ABfBac5B2d20FbD0bac63D1125E4eB391";
+  static const String _eventFactoryAddress = "0x1F2F71fa673a38CBC5848985A74713bDfB584578";
   
   // Network configuration
-  static const String _rpcUrl = "https://sepolia-rollup.arbitrum.io/rpc";
-  static const int _chainId = 421614; // Arbitrum Sepolia Testnet
+  static const String _rpcUrl = "https://dream-rpc.somnia.network";
+  static const int _chainId = 50312; // Somnia Testnet
 
   ReownAppKitModal? _appKitModal;
   final StorageService _storageService = StorageService();
@@ -662,7 +662,7 @@ class NFTService {
       'eventFactoryAddress': _eventFactoryAddress,
       'rpcUrl': _rpcUrl,
       'chainId': _chainId,
-      'networkName': 'Arbitrum Sepolia Testnet',
+      'networkName': 'somnia testnet',
     };
   }
 }

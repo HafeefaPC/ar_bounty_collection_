@@ -16,7 +16,7 @@ import '../../../shared/widgets/wallet_connection_wrapper.dart';
 import '../../../shared/services/global_wallet_service.dart';
 import '../../../shared/providers/web3_provider.dart';
 import '../../../shared/providers/reown_provider.dart';
-import '../../../shared/services/test_web3_integration.dart';
+import '../../../shared/services/somnia_web3_service.dart';
 import 'package:reown_appkit/reown_appkit.dart';
 
 import 'package:geocoding/geocoding.dart';
@@ -72,6 +72,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   
   // Loading state
   bool _isLoading = false;
+  
+  // Transaction state management
+  bool _isTransactionInProgress = false;
   
   // Role checking removed - anyone can create events now!
 
@@ -1889,158 +1892,17 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     );
   }
 
-  // Test method to verify wallet transaction dialog
-  Future<void> _testWalletTransaction() async {
-    print('🧪 Testing wallet transaction dialog...');
-    
-    final walletState = ref.read(walletConnectionProvider);
-    if (!walletState.isConnected || walletState.walletAddress == null) {
-      _showRetroError('Please connect your wallet first');
-      return;
-    }
-    
-    final reownAppKit = ref.read(reownAppKitProvider);
-    if (reownAppKit == null) {
-      _showRetroError('Wallet not connected');
-      return;
-    }
-
-    try {
-      print('🔍 Wallet state check:');
-      print('  - Connected: ${walletState.isConnected}');
-      print('  - Address: ${walletState.walletAddress}');
-      print('  - Chain ID: ${walletState.chainId}');
-      print('  - Session Topic: ${walletState.sessionTopic}');
-      
-      // Use a simple ETH transfer instead of contract interaction to avoid revert
-      // Send 0 ETH to the user's own address - this should always succeed
-      final transactionParams = {
-        'to': walletState.walletAddress!.toLowerCase(), // Send to self
-        'data': '0x', // Empty data - simple transfer
-        'from': walletState.walletAddress!.toLowerCase(),
-        'gas': '0x${(21000).toRadixString(16)}', // Standard gas limit for ETH transfer
-        'gasPrice': '0x${(1000000000).toRadixString(16)}', // 1 gwei
-        'value': '0x0', // No ETH being sent - just test the flow
-      };
-      
-      print('🧪 Test transaction parameters:');
-      print('  - To: ${transactionParams['to']}');
-      print('  - From: ${transactionParams['from']}');
-      print('  - Gas: ${transactionParams['gas']}');
-      print('  - Gas Price: ${transactionParams['gasPrice']}');
-      print('  - Value: ${transactionParams['value']}');
-      print('  - Data: ${transactionParams['data']}');
-      
-      print('🔗 Sending request to wallet...');
-      final result = await reownAppKit.request(
-        topic: walletState.sessionTopic!,
-        chainId: 'eip155:421614',
-        request: SessionRequestParams(
-          method: 'eth_sendTransaction',
-          params: [transactionParams],
-        ),
-      ).timeout(
-        const Duration(seconds: 120), // 2 minute timeout for user interaction
-        onTimeout: () {
-          print('⏰ Test transaction timed out - user may not have approved');
-          throw Exception('Transaction request timed out. Please check your wallet and try again.');
-        },
-      );
-      
-      print('📨 Raw result received from wallet:');
-      print('  - Type: ${result.runtimeType}');
-      print('  - Value: $result');
-      
-      // Enhanced result parsing
-      String? transactionHash;
-      
-      if (result is String) {
-        print('📝 Result is String: $result');
-        if (result.startsWith('0x') && result.length == 66) {
-          transactionHash = result;
-          print('✅ Found valid transaction hash: $transactionHash');
-        } else {
-          print('⚠️ String result is not a valid transaction hash');
-        }
-      } else if (result is Map) {
-        print('📝 Result is Map with keys: ${result.keys.toList()}');
-        
-        // Check if this is an error response first
-        if (result.containsKey('code') && result.containsKey('message')) {
-          final errorCode = result['code'];
-          final errorMessage = result['message'];
-          print('📝 Error response detected - Code: $errorCode, Message: $errorMessage');
-          
-          if (errorCode == 5000 || errorMessage.toString().toLowerCase().contains('user rejected')) {
-            print('📝 User rejection detected in JSON response');
-            throw Exception('User rejected the transaction in wallet');
-          } else {
-            print('📝 Other error in JSON response');
-            throw Exception('Wallet error: $errorMessage (Code: $errorCode)');
-          }
-        }
-        
-        // Try multiple possible keys for the transaction hash
-        final possibleKeys = ['hash', 'transactionHash', 'txHash', 'tx_hash'];
-        for (final key in possibleKeys) {
-          if (result.containsKey(key)) {
-            final hash = result[key];
-            print('📝 Found key "$key" with value: $hash (${hash.runtimeType})');
-            if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-              transactionHash = hash;
-              print('✅ Found valid transaction hash from key "$key": $transactionHash');
-              break;
-            }
-          }
-        }
-      } else if (result is List && result.isNotEmpty) {
-        print('📝 Result is List with ${result.length} items');
-        final firstItem = result.first;
-        print('📝 First item: $firstItem (${firstItem.runtimeType})');
-        if (firstItem is String && firstItem.startsWith('0x') && firstItem.length == 66) {
-          transactionHash = firstItem;
-          print('✅ Found valid transaction hash from list: $transactionHash');
-        }
-      } else {
-        print('📝 Result is of unexpected type: ${result.runtimeType}');
-      }
-      
-      if (transactionHash != null) {
-        print('🎉 Test transaction SUCCESS!');
-        print('📝 Transaction Hash: $transactionHash');
-        _showRetroSuccess('Test Wallet Connection Successful!\n\nTransaction Hash: ${transactionHash.substring(0, 10)}...${transactionHash.substring(transactionHash.length - 8)}\n\nYour wallet is properly connected and ready for transactions.');
-      } else {
-        print('⚠️ Transaction may have succeeded but received unexpected result format');
-        _showRetroError('Test Transaction Completed but Unexpected Result\n\nCode: 5000\nMessage: Unexpected response format\n\nReceived: $result\n\nYour wallet connection may still be working, but please check the transaction in your wallet.');
-      }
-      
-    } catch (e) {
-      print('❌ Test transaction FAILED with error: $e');
-      
-      // Enhanced error parsing
-      String errorMessage = e.toString().toLowerCase();
-      String userFriendlyMessage;
-      
-      if (errorMessage.contains('user rejected') || errorMessage.contains('user denied')) {
-        userFriendlyMessage = 'Test Transaction Cancelled\n\nYou cancelled the transaction in your wallet. This is normal if you chose not to proceed.';
-      } else if (errorMessage.contains('insufficient funds')) {
-        userFriendlyMessage = 'Test Transaction Failed\n\nInsufficient ETH for gas fees. You need a small amount of ETH on Arbitrum Sepolia to pay for transaction fees.';
-      } else if (errorMessage.contains('timeout')) {
-        userFriendlyMessage = 'Test Transaction Timed Out\n\nThe transaction request timed out. Please check your wallet and try again.';
-      } else if (errorMessage.contains('wrong network') || errorMessage.contains('chain')) {
-        userFriendlyMessage = 'Test Transaction Failed\n\nPlease ensure you are on the Arbitrum Sepolia network in your wallet.';
-      } else {
-        userFriendlyMessage = 'Test Transaction Failed\n\nError: $e\n\nPlease check your wallet connection and try again.';
-      }
-      
-      _showRetroError(userFriendlyMessage);
-    }
-  }
 
   Future<void> _createEvent() async {
     print('🚀 Creating event with smart contract integration...');
     print('Current step: $_currentStep');
     print('Can proceed: ${_canProceedToNextStep()}');
+    
+    // Prevent concurrent transactions
+    if (_isTransactionInProgress) {
+      print('⚠️ Transaction already in progress, ignoring duplicate request');
+      return;
+    }
     
     // Only validate form if we're on step 0 (event details)
     if (_currentStep == 0 && _formKey.currentState != null) {
@@ -2114,16 +1976,22 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     
     // Extract chain ID without eip155: prefix for comparison
     final currentChainId = updatedWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-    if (currentChainId != '421614') {
-      print('⚠️ Wrong chain detected. Current: ${updatedWalletState.chainId} (parsed: $currentChainId), Expected: 421614');
+    print('🔍 Chain ID Analysis:');
+    print('  - Raw chain ID: ${updatedWalletState.chainId}');
+    print('  - Parsed chain ID: $currentChainId');
+    print('  - Expected: 50312');
+    print('  - Match: ${currentChainId == '50312'}');
+    
+    if (currentChainId != '50312') {
+      print('⚠️ Wrong chain detected. Current: ${updatedWalletState.chainId} (parsed: $currentChainId), Expected: 50312');
       
       // Try to automatically switch
-      print('🔄 Attempting to switch to Arbitrum Sepolia...');
-      final switched = await walletNotifier.switchToArbitrumSepolia();
+      print('🔄 Attempting to switch to Somnia Testnet...');
+      final switched = await walletNotifier.switchToSomniaTestnet();
       
       if (!switched) {
         print('❌ Automatic switch failed, showing manual instructions');
-        _showRetroError('Please manually switch to Arbitrum Sepolia network in your wallet settings.');
+        _showRetroError('Please manually switch to Somnia Testnet network in your wallet settings.');
         return;
       }
       
@@ -2141,22 +2009,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       print('Chain ID: ${finalWalletState.chainId}');
       
       final finalChainId = finalWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-      if (finalChainId != '421614') {
+      if (finalChainId != '50312') {
         print('❌ Chain switch still failed after automatic attempt');
-        _showRetroError('Chain switch failed. Please manually switch to Arbitrum Sepolia in your wallet settings.');
+        _showRetroError('Chain switch failed. Please manually switch to Somnia Testnet in your wallet settings.');
         return;
       }
       
-      print('✅ Successfully switched to Arbitrum Sepolia!');
+      print('✅ Successfully switched to Somnia Testnet!');
     } else {
-      print('✅ Already on Arbitrum Sepolia (Chain ID: ${updatedWalletState.chainId} -> $currentChainId)');
+      print('✅ Already on Somnia Testnet (Chain ID: ${updatedWalletState.chainId} -> $currentChainId)');
     }
     
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isTransactionInProgress = true;
+    });
     
     try {
-      // Get services
-      final web3Service = ref.read(web3ServiceProvider);
+      // Get services - use Somnia-specific service
+      final web3Service = SomniaWeb3Service();
+      web3Service.initialize(); // Initialize with Somnia Testnet
       final ipfsService = ref.read(ipfsServiceProvider);
       final supabaseService = SupabaseService();
       
@@ -2235,43 +2107,38 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         ipfsMetadataUrl = 'metadata_${DateTime.now().millisecondsSinceEpoch}';
       }
       
-      // Step 5: Create event on blockchain
-      print('⛓️ Creating event on blockchain...');
+      // Step 5: Create event on blockchain using Somnia-specific approach
+      print('⛓️ Creating event on blockchain (Somnia-specific)...');
       final reownAppKit = ref.read(reownAppKitProvider);
       if (reownAppKit == null) {
         throw Exception('Wallet not connected');
       }
       
-      // Generate unique event code with retry mechanism
-      String eventCode;
-      int attempts = 0;
-      const maxAttempts = 3;
+      // Generate unique event code (simplified like Avalanche)
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final random = (timestamp % 10000).toString().padLeft(4, '0');
+      final eventCode = 'EVT_${timestamp}_$random';
       
-      do {
-        attempts++;
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final random = (timestamp % 10000).toString().padLeft(4, '0');
-        eventCode = 'EVT_${timestamp}_$random';
-        
-        print('🎯 Generated Event Code (attempt $attempts): $eventCode');
-        print('🎯 Timestamp: $timestamp');
-        print('🎯 Random suffix: $random');
-        
-        // Check if event code already exists
-        print('🔍 Checking if event code already exists...');
+      print('🎯 Generated Event Code: $eventCode');
+      print('🎯 Timestamp: $timestamp');
+      print('🎯 Random suffix: $random');
+      
+      // Check if event code already exists (optional - for debugging)
+      try {
         final codeExists = await web3Service.eventCodeExists(eventCode);
-        if (!codeExists) {
-          print('✅ Event code is unique and available');
-          break;
-        } else {
+        if (codeExists) {
           print('⚠️ Event code already exists, generating new one...');
-          if (attempts >= maxAttempts) {
-            throw Exception('Unable to generate unique event code after $maxAttempts attempts. Please try again.');
-          }
-          // Wait a bit before trying again
-          await Future.delayed(Duration(milliseconds: 100));
+          final newTimestamp = DateTime.now().millisecondsSinceEpoch;
+          final newRandom = (newTimestamp % 10000).toString().padLeft(4, '0');
+          final newEventCode = 'EVT_${newTimestamp}_$newRandom';
+          print('🎯 New Event Code: $newEventCode');
+        } else {
+          print('✅ Event code is unique');
         }
-      } while (attempts < maxAttempts);
+      } catch (e) {
+        print('⚠️ Could not check event code uniqueness: $e');
+        // Continue anyway - the contract will handle duplicates
+      }
       
       // Calculate timestamps - ensure start time is in the future
       final now = DateTime.now();
@@ -2282,12 +2149,23 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           ? DateTime(_endDate!.year, _endDate!.month, _endDate!.day, _endTime!.hour, _endTime!.minute)
           : startDateTime.add(Duration(hours: 24)); // Default to 24 hours after start
       
-      // Validate timestamps
+      // Validate timestamps with better error messages
       if (startDateTime.isBefore(now)) {
-        throw Exception('Start time must be in the future. Please select a future date and time.');
+        final timeDiff = now.difference(startDateTime);
+        throw Exception('Start time must be in the future. Selected time is ${timeDiff.inMinutes} minutes in the past. Please select a future date and time.');
       }
       if (endDateTime.isBefore(startDateTime)) {
-        throw Exception('End time must be after start time.');
+        final timeDiff = startDateTime.difference(endDateTime);
+        throw Exception('End time must be after start time. End time is ${timeDiff.inMinutes} minutes before start time.');
+      }
+      
+      // Additional validation for reasonable time ranges
+      final eventDuration = endDateTime.difference(startDateTime);
+      if (eventDuration.inDays > 365) {
+        throw Exception('Event duration cannot exceed 365 days. Please select a shorter event period.');
+      }
+      if (eventDuration.inMinutes < 5) {
+        throw Exception('Event duration must be at least 5 minutes. Please select a longer event period.');
       }
       
       print('🎯 Timestamp Validation:');
@@ -2326,9 +2204,9 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         );
       }
       
-      // Step 5: Create event directly - no role restrictions anymore!
-      print('🚀 Creating event on blockchain with new contract (no role restrictions)...');
-      print('📝 Using EventFactory address: 0x465865E0bFA28d7794fC103b57fd089656872907');
+      // Step 5: Create event using Avalanche-style approach
+      print('🚀 Creating event on blockchain (Avalanche-style approach)...');
+      print('📝 Using EventFactory address: ${web3Service.eventFactoryAddress}');
       final txHash = await web3Service.createEvent(
           eventName: _nameController.text,
           eventDescription: _descriptionController.text,
@@ -2343,22 +2221,29 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           endTime: (endDateTime.millisecondsSinceEpoch ~/ 1000), // Convert to seconds
           radius: 100, // Default 100 meters radius
           signTransaction: (to, data) async {
-            print('🔐 Signing transaction...');
+            // Use the updated wallet state from the beginning of the method
+            final transactionChainId = updatedWalletState.chainId?.replaceAll('eip155:', '') ?? '';
+            
+            print('🔐 Signing transaction (Somnia-specific EIP-1559)...');
             print('To: $to');
             print('Data: ${data[0]}');
             print('Data length: ${data[0].toString().length}');
             print('From: ${walletState.walletAddress}');
+            print('Chain ID: $transactionChainId');
             
             // Re-validate wallet state before transaction
             final currentWalletState = ref.read(walletConnectionProvider);
             if (!currentWalletState.isConnected || currentWalletState.walletAddress == null) {
               throw Exception('Wallet disconnected during transaction. Please reconnect.');
             }
+            print('🔍 Transaction Chain ID Analysis:');
+            print('  - Raw chain ID: ${updatedWalletState.chainId}');
+            print('  - Parsed chain ID: $transactionChainId');
+            print('  - Expected: 50312');
+            print('  - Match: ${transactionChainId == '50312'}');
             
-            // Use the updated wallet state from the beginning of the method
-            final transactionChainId = updatedWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-            if (transactionChainId != '421614') {
-              throw Exception('Wrong network. Please switch to Arbitrum Sepolia (Chain ID: 421614)');
+            if (transactionChainId != '50312') {
+              throw Exception('Wrong network. Please switch to Somnia Testnet (Chain ID: 50312). Current: $transactionChainId');
             }
             
             // Validate transaction data
@@ -2377,58 +2262,138 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               transactionData = '0x$transactionData';
             }
             
-            // Create transaction parameters with proper formatting for WalletConnect CAIP-2
+            // Create transaction parameters using LEGACY GAS for Somnia Testnet
+            // This avoids EIP-1559 issues that cause "User rejected" errors
+            final gasLimit = 2000000; // 2M gas limit
+            final gasPrice = 2000000000; // 2 gwei - legacy gas price
+            final value = 0; // No STT being sent
+            
             final transactionParams = {
-              'to': to.toLowerCase(), // Ensure lowercase address
-              'data': transactionData, // Properly formatted hex data
-              'from': updatedWalletState.walletAddress!.toLowerCase(), // Use updated wallet state
-              'gas': '0x${(1500000).toRadixString(16)}', // Significantly increased gas limit for event creation
-              'gasPrice': '0x${(3000000000).toRadixString(16)}', // Increased to 3 gwei for better inclusion
-              'value': '0x0', // No ETH being sent
+              'to': to.toLowerCase(),
+              'data': transactionData,
+              'from': updatedWalletState.walletAddress!.toLowerCase(),
+              'gas': '0x${gasLimit.toRadixString(16)}',
+              'gasPrice': '0x${gasPrice.toRadixString(16)}', // Legacy gas price
+              'value': '0x${value.toRadixString(16)}',
+              // No 'type' field - this makes it a legacy transaction
             };
+            
+            print('🔧 Transaction Parameter Analysis (Legacy Gas):');
+            print('  - To Address: ${transactionParams['to']}');
+            print('  - From Address: ${transactionParams['from']}');
+            print('  - Gas Limit: ${gasLimit} (0x${gasLimit.toRadixString(16)})');
+            print('  - Gas Price: ${gasPrice} wei (${gasPrice / 1000000000} gwei)');
+            print('  - Value: ${value} STT');
+            print('  - Transaction Type: Legacy (no type field)');
+            print('  - Data Length: ${transactionData.length} characters');
+            print('  - Data Preview: ${transactionData.substring(0, 20)}...');
             
             print('📋 Transaction params: $transactionParams');
             print('📡 Sending to chain: eip155:$transactionChainId');
             print('📞 Session topic: ${updatedWalletState.sessionTopic}');
             
+            // Pre-transaction validation
+            print('🔍 Pre-transaction Validation (Legacy Gas):');
+            print('  - Contract address valid: ${to.isNotEmpty && to.startsWith('0x') && to.length == 42}');
+            print('  - Transaction data valid: ${transactionData.isNotEmpty && transactionData.startsWith('0x')}');
+            print('  - Gas limit reasonable: ${gasLimit > 100000 && gasLimit < 10000000}');
+            print('  - Gas price reasonable: ${gasPrice > 1000000000 && gasPrice < 10000000000}');
+            print('  - Value is zero: ${value == 0}');
+            print('  - Chain ID correct: $transactionChainId');
+            print('  - Transaction type: Legacy (no type field)');
+            
+            // Calculate estimated gas cost
+            final estimatedGasCost = (gasLimit * gasPrice) / 1000000000000000000; // Convert to STT
+            print('  - Estimated gas cost: ${estimatedGasCost.toStringAsFixed(6)} STT');
+            print('  - Gas cost in gwei: ${(gasLimit * gasPrice / 1000000000).toStringAsFixed(0)} gwei');
+            
             // Show wallet dialog message to user
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Row(
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.account_balance_wallet, color: AppTheme.backgroundColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Check your wallet app to approve the transaction',
-                          style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
+                      Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet, color: AppTheme.backgroundColor),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'MetaMask Transaction Ready',
+                              style: AppTheme.modernBodySecondary.copyWith(
+                                color: AppTheme.backgroundColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please check MetaMask and click "Confirm" to create your event. Do NOT click "Reject".',
+                        style: AppTheme.modernBodySecondary.copyWith(
+                          color: AppTheme.backgroundColor,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                   backgroundColor: AppTheme.accentColor,
-                  duration: const Duration(seconds: 10),
+                  duration: const Duration(seconds: 15),
                 ),
               );
             }
             
             try {
-              print('🚀 Sending transaction to wallet...');
+              print('🚀 Sending transaction to wallet (Somnia Testnet - Legacy Gas)...');
               print('📋 Transaction params: $transactionParams');
               print('📡 Chain ID: eip155:$transactionChainId');
               print('📞 Session topic: ${updatedWalletState.sessionTopic}');
               
-              // Use ReownAppKit to sign and send the transaction
+              // Validate session before making request
+              if (updatedWalletState.sessionTopic == null) {
+                throw Exception('Wallet session not available. Please reconnect your wallet.');
+              }
+              
+              // Show user that transaction is being sent to wallet
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.backgroundColor),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Sending legacy gas transaction... Please check MetaMask.',
+                            style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: AppTheme.accentColor,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
+              
               final result = await reownAppKit.request(
                 topic: updatedWalletState.sessionTopic!,
-                chainId: 'eip155:$transactionChainId', // Use clean chain ID (421614)
+                chainId: 'eip155:$transactionChainId',
                 request: SessionRequestParams(
                   method: 'eth_sendTransaction',
                   params: [transactionParams],
                 ),
               ).timeout(
-                const Duration(seconds: 180), // Increased timeout to 3 minutes
+                const Duration(seconds: 180), // 3 minutes timeout
                 onTimeout: () {
                   print('⏰ Transaction request timed out after 3 minutes');
                   throw Exception('Transaction request timed out. The transaction may still be processing in your wallet.');
@@ -2437,94 +2402,177 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               
               print('📝 Raw transaction result: $result');
               print('📝 Result type: ${result.runtimeType}');
+              print('📝 Result is null: ${result == null}');
               
-              // Handle different response formats
+              // Enhanced result handling with better debugging
               String? transactionHash;
+              
+              if (result == null) {
+                print('❌ Result is null - this might indicate user rejection or network issue');
+                throw Exception('No response from wallet - transaction may have been cancelled');
+              }
               
               if (result is String) {
                 print('📝 Result is String: $result');
+                print('📝 String length: ${result.length}');
+                print('📝 Starts with 0x: ${result.startsWith('0x')}');
+                
                 if (result.startsWith('0x') && result.length == 66) {
                   transactionHash = result;
+                  print('✅ Valid transaction hash found in string result');
+                } else if (result.toLowerCase().contains('user rejected') || 
+                          result.toLowerCase().contains('cancelled') ||
+                          result.toLowerCase().contains('rejected')) {
+                  print('❌ User rejection detected in string result');
+                  throw Exception('Transaction cancelled by user');
                 } else {
-                  print('⚠️ String result doesn\'t look like a transaction hash');
+                  print('❌ Invalid string result format: $result');
+                  throw Exception('Invalid response from wallet: $result');
                 }
               } else if (result is Map) {
-                print('📝 Result is Map: $result');
-                if (result.containsKey('hash')) {
-                  final hash = result['hash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
-                  }
-                } else if (result.containsKey('transactionHash')) {
-                  final hash = result['transactionHash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
-                  }
-                } else if (result.containsKey('txHash')) {
-                  final hash = result['txHash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
+                print('📝 Result is Map with keys: ${result.keys.toList()}');
+                print('📝 Full map result: $result');
+                
+                // Check for user rejection FIRST (before looking for hash)
+                if (result.containsKey('code') && result.containsKey('message')) {
+                  final code = result['code'];
+                  final message = result['message'];
+                  print('📝 Error code: $code, message: $message');
+                  
+                  // Common rejection codes
+                  if (code == 5000 || code == 4001 || code == -32000) {
+                    final messageStr = message.toString().toLowerCase();
+                    if (messageStr.contains('user rejected') ||
+                        messageStr.contains('cancelled') ||
+                        messageStr.contains('rejected') ||
+                        messageStr.contains('denied')) {
+                      print('❌ User rejection confirmed by error code and message');
+                      throw Exception('Transaction cancelled by user');
+                    }
                   }
                 }
+                
+                // Check for transaction hash in various possible keys
+                final possibleHashKeys = ['hash', 'transactionHash', 'txHash', 'transaction_id'];
+                for (final key in possibleHashKeys) {
+                  if (result.containsKey(key)) {
+                    final hash = result[key];
+                    print('📝 Found potential hash in key "$key": $hash');
+                    if (hash is String && hash.startsWith('0x') && hash.length == 66) {
+                      transactionHash = hash;
+                      print('✅ Valid transaction hash found in key "$key"');
+                      break;
+                    }
+                  }
+                }
+                
+                // If no hash found, check if it's a pending/processing state
+                if (transactionHash == null) {
+                  if (result.containsKey('status') || result.containsKey('pending')) {
+                    print('📝 Transaction appears to be pending/processing');
+                    // Don't throw error for pending transactions - wait for completion
+                    throw Exception('Transaction is still processing. Please wait for confirmation.');
+                  }
+                  
+                  print('❌ No valid transaction hash found in map result');
+                  print('❌ Available keys: ${result.keys.toList()}');
+                  throw Exception('Transaction failed - no valid hash in response: $result');
+                }
               } else if (result is List && result.isNotEmpty) {
-                print('📝 Result is List: $result');
+                print('📝 Result is List with ${result.length} items');
+                print('📝 First item: ${result.first}');
+                print('📝 First item type: ${result.first.runtimeType}');
+                
                 final firstItem = result.first;
                 if (firstItem is String && firstItem.startsWith('0x') && firstItem.length == 66) {
                   transactionHash = firstItem;
+                  print('✅ Valid transaction hash found in list result');
+                } else {
+                  print('❌ Invalid first item in list result: $firstItem');
+                  throw Exception('Invalid response format from wallet');
                 }
+              } else {
+                print('❌ Unexpected result type: ${result.runtimeType}');
+                print('❌ Result value: $result');
+                throw Exception('Unexpected response type from wallet: ${result.runtimeType}');
               }
               
-              if (transactionHash != null) {
-                print('✅ Transaction hash extracted: $transactionHash');
+              if (transactionHash != null) { // ignore: unnecessary_null_comparison
+                print('✅ Transaction hash successfully extracted: $transactionHash');
                 return transactionHash;
-              } else {
-                print('❌ Could not extract transaction hash from result: $result');
-                // Check if the result indicates the transaction was sent but response was lost
-                if (result != null && result.toString().isNotEmpty) {
-                  print('⚠️ Transaction may have been sent but response format is unexpected');
-                  throw Exception('Transaction was sent but response format is unexpected. Please check your wallet for the transaction status.');
-                } else {
-                  throw Exception('Transaction failed - no response received from wallet.');
-                }
               }
+              
+              print('❌ Could not extract transaction hash from result: $result');
+              throw Exception('Transaction failed - could not extract transaction hash');
               
             } catch (e) {
               print('❌ Transaction signing failed: $e');
               print('❌ Error type: ${e.runtimeType}');
-              print('❌ Error details: ${e.toString()}');
+              print('❌ Full error details: ${e.toString()}');
               
-              // Parse common errors
+              // Enhanced error handling with Somnia Testnet specific debugging
               final errorString = e.toString().toLowerCase();
+              print('❌ Error string analysis: $errorString');
+              print('❌ Full error details: ${e.toString()}');
+              print('❌ Error type: ${e.runtimeType}');
               
-              if (errorString.contains('user rejected') || 
-                  errorString.contains('user cancelled') ||
-                  errorString.contains('user canceled') ||
-                  errorString.contains('rejected by user') ||
-                  errorString.contains('cancelled by user') ||
-                  errorString.contains('canceled by user')) {
-                throw Exception('Transaction cancelled by user');
+              // Check for Somnia Testnet specific issues first
+              if (errorString.contains('gas price') || errorString.contains('gasprice')) {
+                print('❌ Gas price error detected');
+                throw Exception('Gas price error. Please check your wallet gas settings for Somnia Testnet. Try increasing gas price to 3-5 gwei.');
+              } else if (errorString.contains('chain id') || errorString.contains('chainid')) {
+                print('❌ Chain ID error detected');
+                throw Exception('Chain ID error. Please ensure you are connected to Somnia Testnet (Chain ID: 50312).');
+              } else if (errorString.contains('user rejected') || 
+                         errorString.contains('cancelled') ||
+                         errorString.contains('rejected by user') ||
+                         errorString.contains('user denied') ||
+                         errorString.contains('user cancelled')) {
+                print('❌ Confirmed user rejection');
+                throw Exception('Transaction cancelled by user. Please try again and make sure to click "Confirm" in MetaMask.');
+              } else if (errorString.contains('still processing') || 
+                         errorString.contains('processing') ||
+                         errorString.contains('pending')) {
+                print('❌ Transaction is still processing');
+                throw Exception('Transaction is still being processed in your wallet. Please wait for confirmation or check your wallet history.');
               } else if (errorString.contains('insufficient funds') || 
-                         errorString.contains('insufficient balance')) {
-                throw Exception('Insufficient ETH for gas fees');
-              } else if (errorString.contains('nonce')) {
-                throw Exception('Transaction nonce error. Please try again.');
+                         errorString.contains('insufficient balance') ||
+                         errorString.contains('not enough')) {
+                print('❌ Insufficient funds error');
+                throw Exception('Insufficient STT for gas fees. Please add more STT to your wallet from the faucet: https://testnet.somnia.network/');
               } else if (errorString.contains('timeout') || 
                          errorString.contains('timed out')) {
-                throw Exception('Transaction timed out. Please check your wallet and try again.');
+                print('❌ Timeout error');
+                throw Exception('Transaction timed out. Please try again.');
               } else if (errorString.contains('network') || 
-                         errorString.contains('connection')) {
-                throw Exception('Network error. Please check your connection and try again.');
-              } else if (errorString.contains('gas')) {
-                throw Exception('Gas estimation failed. Please try again.');
+                         errorString.contains('connection') ||
+                         errorString.contains('unreachable')) {
+                print('❌ Network error');
+                throw Exception('Network error. Please check your connection to Somnia Testnet and try again.');
+              } else if (errorString.contains('no response')) {
+                print('❌ No response from wallet');
+                throw Exception('No response from wallet. Please check your wallet connection and try again.');
+              } else if (errorString.contains('invalid response') || 
+                         errorString.contains('unexpected')) {
+                print('❌ Invalid response error');
+                throw Exception('Invalid response from wallet. Please try again.');
+              } else if (errorString.contains('revert') || errorString.contains('execution reverted')) {
+                print('❌ Transaction reverted');
+                throw Exception('Transaction reverted on Somnia Testnet. This may be due to invalid parameters or contract issues. Please check the transaction on the explorer.');
               } else {
-                // For unknown errors, provide a more helpful message
-                throw Exception('Transaction failed: ${e.toString()}');
+                print('❌ Generic error - providing detailed message');
+                throw Exception('Transaction failed on Somnia Testnet (Legacy Gas): ${e.toString()}');
               }
             }
           },
         );
       
       print('✅ Event creation transaction sent: $txHash');
+      
+      // Validate transaction hash format
+      if (txHash.length != 66 || !txHash.startsWith('0x')) {
+        throw Exception('Invalid transaction hash received from wallet');
+      }
       
       // Show transaction pending status
       if (mounted) {
@@ -2557,6 +2605,8 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       
       // Step 6: Wait for transaction confirmation with improved polling
       print('⏳ Waiting for transaction confirmation...');
+      print('📝 Transaction Hash: $txHash');
+      print('🔗 Check on Somnia Explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       // Show confirmation progress
       if (mounted) {
@@ -2575,7 +2625,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Waiting for blockchain confirmation... This may take a few minutes.',
+                    'Transaction sent! Waiting for blockchain confirmation...',
                     style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                   ),
                 ),
@@ -2599,11 +2649,14 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         print('  - To: ${receipt.to}');
         print('  - Contract Address: ${receipt.contractAddress}');
         print('  - Logs Count: ${receipt.logs.length}');
-        print('🔗 View on Arbiscan: https://sepolia.arbiscan.io/tx/${receipt.transactionHash}');
+        print('🔗 View on Somnia Explorer: https://shannon-explorer.somnia.network/tx/${receipt.transactionHash}');
       } else {
         print('  - Receipt is null - transaction may not be mined yet');
+        print('⚠️ Transaction confirmation timed out, but transaction may still be pending');
+        print('🔗 Check on Somnia Explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       }
       
+      // If we have a receipt and it's successful, proceed normally
       if (receipt != null && receipt.status == true) {
         print('✅ Event created successfully on blockchain!');
         
@@ -2658,6 +2711,62 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         if (mounted) {
           _showEventCreatedDialog(createdEvent, txHash: txHash);
         }
+      } else if (receipt == null) {
+        // Transaction confirmation timed out, but transaction was sent
+        print('⚠️ Transaction confirmation timed out, but proceeding with local event creation');
+        print('⚠️ User can check transaction status manually on the explorer');
+        
+        // Create local event record even without blockchain confirmation
+        final localEvent = models.Event(
+          name: _nameController.text,
+          description: _descriptionController.text,
+          organizerWalletAddress: updatedWalletState.walletAddress!,
+          latitude: _selectedAreaCenter?.latitude ?? _center.latitude,
+          longitude: _selectedAreaCenter?.longitude ?? _center.longitude,
+          venueName: _venueController.text,
+          boundaries: _boundaryLocations.asMap().entries.map((entry) {
+            final index = entry.key;
+            final location = entry.value;
+            
+            return Boundary(
+              name: 'Boundary ${index + 1}',
+              description: 'NFT Boundary ${index + 1}',
+              imageUrl: ipfsImageUrl,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              radius: _boundaryRadius,
+              eventId: '', // Will be set when event is created
+            );
+          }).toList(),
+          startDate: _startDate != null && _startTime != null
+              ? DateTime(
+                  _startDate!.year,
+                  _startDate!.month,
+                  _startDate!.day,
+                  _startTime!.hour,
+                  _startTime!.minute,
+                )
+              : null,
+          endDate: _endDate != null && _endTime != null
+              ? DateTime(
+                  _endDate!.year,
+                  _endDate!.month,
+                  _endDate!.day,
+                  _endTime!.hour,
+                  _endTime!.minute,
+                )
+              : null,
+          nftSupplyCount: nftSupplyCount,
+          eventImageUrl: ipfsImageUrl,
+        );
+        
+        // Save to Supabase for local reference
+        final createdEvent = await supabaseService.createEvent(localEvent);
+        print('✅ Local event record created with ID: ${createdEvent.id}');
+        
+        if (mounted) {
+          _showEventCreatedDialog(createdEvent, txHash: txHash, isPending: true);
+        }
       } else {
         // Transaction was reverted - provide detailed error information
         print('❌ Transaction REVERTED on blockchain');
@@ -2665,7 +2774,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         String userMessage = 'Transaction Failed - Reverted on Blockchain';
         String debugInfo = '';
         
-        if (receipt != null) {
+        if (receipt != null) { // ignore: unnecessary_null_comparison
           debugInfo = '''
 📋 Transaction Details:
   - Hash: ${receipt.transactionHash}
@@ -2673,37 +2782,50 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
   - Gas Used: ${receipt.gasUsed}
   - Status: REVERTED
   
-🔗 View on Arbiscan: https://sepolia.arbiscan.io/tx/${receipt.transactionHash}
+🔗 View on Somnia Explorer: https://shannon-explorer.somnia.network/tx/${receipt.transactionHash}
           ''';
           
           print('❌ Detailed revert information:');
           print('  - Transaction Hash: ${receipt.transactionHash}');
           print('  - Block Number: ${receipt.blockNumber}');
           print('  - Gas Used: ${receipt.gasUsed}');
-          print('  - Revert analysis: Check Arbiscan for revert reason');
+          print('  - Revert analysis: Check Somnia Explorer for revert reason');
           
           // Common reasons for transaction revert in event creation:
           revertReason = '''
-🚨 MOST LIKELY CAUSE: Invalid Parameters or Contract Logic
+🚨 TRANSACTION REVERTED - Most Likely Causes:
 
-Possible causes:
-• Event code "$eventCode" already exists
-• Invalid timestamps or parameters
-• Contract paused or restricted
-• Network congestion
-• Insufficient gas limit
+1. Event Code Already Exists
+   • Code "$eventCode" may already be used
+   • Try creating with a different name
+
+2. Invalid Parameters
+   • Start time must be in the future
+   • End time must be after start time
+   • Invalid coordinates or venue data
+
+3. Contract Issues
+   • Contract may be paused
+   • Insufficient gas for execution
+   • Network congestion
+
+4. Gas Issues
+   • Gas limit too low for execution
+   • Gas price too low for network
+
+🔍 Check the transaction on Somnia Explorer for detailed error logs.
           ''';
           
           userMessage = '''
-Event Creation Failed - Transaction Reverted
+❌ Event Creation Failed - Transaction Reverted
 
-Your transaction was confirmed on the blockchain but reverted due to a smart contract requirement.
+Your transaction was confirmed but failed during execution.
 
-Transaction Hash: 0x${receipt.transactionHash.map((e) => e.toRadixString(16).padLeft(2, '0')).join().substring(0, 20)}...
+Transaction Hash: ${receipt.transactionHash.toString().substring(0, 20)}...
 
 $revertReason
 
-Please check the transaction on Arbiscan for detailed error information.
+🔗 View Details: https://shannon-explorer.somnia.network/tx/${receipt.transactionHash}
           ''';
         } else {
           revertReason = 'Transaction receipt is null - may not be mined';
@@ -2728,10 +2850,49 @@ Please wait a few minutes and check your wallet history.
       print('❌ Event creation failed, but no role restrictions apply');
       
       if (mounted) {
-        _showRetroError('Error creating event: $e');
+        String userMessage = 'Failed to create event';
+        
+        // Parse error for user-friendly messages
+        final errorString = e.toString().toLowerCase();
+        
+        if (errorString.contains('cancelled by user') || 
+            errorString.contains('rejected by user') ||
+            errorString.contains('transaction cancelled')) {
+          userMessage = '''🚫 Transaction was cancelled in MetaMask
+
+Troubleshooting:
+• Make sure you click "Confirm" not "Reject" in MetaMask
+• Check that you have enough STT for gas fees
+• Ensure you're on Somnia Testnet network
+• Try increasing gas limit if MetaMask shows warning
+• Check MetaMask for any error messages''';
+        } else if (errorString.contains('still being processed') || 
+                   errorString.contains('processing') ||
+                   errorString.contains('pending')) {
+          userMessage = '⏳ Transaction is still processing in your wallet. Please check MetaMask and wait for confirmation.';
+        } else if (errorString.contains('insufficient funds') || 
+                   errorString.contains('insufficient balance')) {
+          userMessage = '💰 Insufficient funds for transaction fees. Please add more STT to your wallet.';
+        } else if (errorString.contains('network') || 
+                   errorString.contains('connection')) {
+          userMessage = '🌐 Network connection error. Please check your internet and try again';
+        } else if (errorString.contains('timeout')) {
+          userMessage = '⏰ Transaction timed out. The transaction may still be processing in your wallet.';
+        } else if (errorString.contains('gas')) {
+          userMessage = '⛽ Transaction failed due to gas issues. Please try again with higher gas limit.';
+        } else if (errorString.contains('no response')) {
+          userMessage = '📱 No response from wallet. Please check your wallet connection and try again.';
+        } else {
+          userMessage = 'Event creation failed. Please check your wallet and try again. Error: ${e.toString()}';
+        }
+        
+        _showRetroError(userMessage);
       }
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isTransactionInProgress = false;
+      });
     }
   }
 
@@ -2761,37 +2922,12 @@ Please wait a few minutes and check your wallet history.
     );
   }
 
-  void _showRetroSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: AppTheme.backgroundColor,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.successColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)), // Pixelated
-        duration: const Duration(seconds: 8), // Longer duration for success messages
-      ),
-    );
-  }
 
   // ORGANIZER_ROLE dialog removed - anyone can create events now!
 
   // All role-related dialogs removed - anyone can create events now!
 
-  void _showEventCreatedDialog(models.Event event, {String? txHash}) {
+  void _showEventCreatedDialog(models.Event event, {String? txHash, bool isPending = false}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -2811,10 +2947,10 @@ Please wait a few minutes and check your wallet history.
               ),
               const SizedBox(height: 16),
               Text(
-                'EVENT CREATED!',
+                isPending ? 'EVENT CREATED (PENDING)' : 'EVENT CREATED!',
                 style: AppTheme.modernTitle.copyWith(
                   fontSize: 20,
-                  color: AppTheme.primaryColor,
+                  color: isPending ? AppTheme.accentColor : AppTheme.primaryColor,
                   letterSpacing: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -2932,6 +3068,37 @@ Please wait a few minutes and check your wallet history.
               
               const SizedBox(height: 16),
               
+              // Pending Notice (if applicable)
+              if (isPending) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        color: AppTheme.accentColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Transaction is pending confirmation. Check the explorer link above for status.',
+                          style: AppTheme.modernBodySecondary.copyWith(
+                            color: AppTheme.accentColor,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
               // Success Notice
               Container(
                 padding: const EdgeInsets.all(12),
@@ -2949,11 +3116,13 @@ Please wait a few minutes and check your wallet history.
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        txHash != null 
-                            ? 'Event created on blockchain successfully!'
-                            : 'Event created successfully!',
+                        isPending 
+                            ? 'Event created locally! Transaction is pending confirmation on blockchain.'
+                            : txHash != null 
+                                ? 'Event created on blockchain successfully!'
+                                : 'Event created successfully!',
                         style: AppTheme.modernBodySecondary.copyWith(
-                          color: AppTheme.successColor,
+                          color: isPending ? AppTheme.accentColor : AppTheme.successColor,
                           fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
@@ -3021,46 +3190,6 @@ Please wait a few minutes and check your wallet history.
     }
   }
 
-  Future<void> _testWeb3Connection() async {
-    try {
-      print('🧪 Testing Web3 connection...');
-      
-      // Run comprehensive Web3 integration tests
-      await TestWeb3Integration.runTests(ref);
-      TestWeb3Integration.printTestResults();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: AppTheme.backgroundColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Web3 integration test completed successfully! Check console for details.',
-                    style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppTheme.successColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Web3 connection test failed: $e');
-      if (mounted) {
-        _showRetroError('Web3 connection test failed: $e');
-      }
-    }
-  }
 
 
 
@@ -3160,50 +3289,6 @@ Please wait a few minutes and check your wallet history.
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                // Debug info (only show in development)
-                if (true) // Change to false in production
-                  Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Step: $_currentStep | Can Proceed: ${_canProceedToNextStep()} | Boundaries: ${_boundaryLocations.length}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      if (_currentStep == _totalSteps - 1)
-                        Column(
-                          children: [
-                            // Test Web3 Connection Button
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ElevatedButton(
-                                onPressed: _testWeb3Connection,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.accentColor,
-                                  foregroundColor: AppTheme.backgroundColor,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                child: Text(
-                                  'Test Web3 Connection',
-                                  style: AppTheme.modernButton.copyWith(
-                                    color: AppTheme.backgroundColor,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
                 Row(
                   children: [
                     if (_currentStep > 0)
@@ -3269,28 +3354,6 @@ Please wait a few minutes and check your wallet history.
                     ),
                   ],
                 ),
-                // Test button for wallet transaction dialog (only on final step)
-                if (_currentStep == _totalSteps - 1) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _testWalletTransaction,
-                      style: AppTheme.modernOutlinedButton.copyWith(
-                        side: MaterialStateProperty.all(
-                          BorderSide(color: AppTheme.accentColor.withOpacity(0.5)),
-                        ),
-                      ),
-                      child: Text(
-                        'Test Wallet Transaction',
-                        style: AppTheme.modernButton.copyWith(
-                          fontSize: 12,
-                          color: AppTheme.accentColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
                 ],
               ),
             ),

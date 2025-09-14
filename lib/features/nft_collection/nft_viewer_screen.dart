@@ -261,7 +261,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
         controller: _tabController,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: AppTheme.primaryGradient,
+          color: AppTheme.primaryColor,
         ),
         labelColor: AppTheme.textColor,
         unselectedLabelColor: AppTheme.textSecondary,
@@ -436,7 +436,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
+                          color: AppTheme.primaryColor,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -598,7 +598,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  gradient: AppTheme.primaryGradient,
+                  color: AppTheme.primaryColor,
                 ),
                 child: nft.hasValidImage
                     ? ClipRRect(
@@ -700,7 +700,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
           height: 60,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: AppTheme.primaryGradient,
+            color: AppTheme.primaryColor,
           ),
           child: nft.hasValidImage
               ? ClipRRect(
@@ -781,7 +781,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
   Widget _buildPlaceholderImage() {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
+        color: AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Center(
@@ -857,7 +857,7 @@ class _NFTViewerScreenState extends ConsumerState<NFTViewerScreen>
                     height: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      gradient: AppTheme.primaryGradient,
+                      color: AppTheme.primaryColor,
                     ),
                     child: nft.hasValidImage
                         ? ClipRRect(

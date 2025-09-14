@@ -49,22 +49,22 @@ class SimpleNFTService {
       final currentChainId = _appKitModal!.selectedChain?.chainId;
       debugPrint('🎨 Current chain ID: $currentChainId');
       
-      // Extract numeric chain ID from eip155:421614 format
+      // Extract numeric chain ID from eip155:50312 format
       final numericChainId = currentChainId?.replaceFirst('eip155:', '') ?? '';
-      if (numericChainId != '421614') {
-        debugPrint('🎨 ⚠️  Wrong network! Current: $currentChainId (numeric: $numericChainId), Expected: 421614');
-        debugPrint('🎨 ⚠️  Please switch to Arbitrum Sepolia in MetaMask');
-        throw Exception('Please switch to Arbitrum Sepolia network');
+      if (numericChainId != '50312') {
+        debugPrint('🎨 ⚠️  Wrong network! Current: $currentChainId (numeric: $numericChainId), Expected: 50312');
+        debugPrint('🎨 ⚠️  Please switch to Somnia Testnet in MetaMask');
+        throw Exception('Please switch to Somnia Testnet network');
       }
 
-      debugPrint('🎨 ✅ Network check passed - on Arbitrum Sepolia');
+      debugPrint('🎨 ✅ Network check passed - on Somnia Testnet');
 
       // Test MetaMask connection first
       debugPrint('🎨 Testing MetaMask connection...');
       try {
         final testResult = await _appKitModal!.request(
           topic: _appKitModal!.session!.topic!,
-            chainId: 'eip155:421614',
+            chainId: 'eip155:50312',
             request: SessionRequestParams(
             method: 'eth_accounts',
             params: [],
@@ -128,8 +128,8 @@ class SimpleNFTService {
         // Standard NFT metadata
         'tokenId': null, // Will be set after minting
         'contractAddress': boundaryNFTContractAddress,
-        'chainId': 421614, // Arbitrum Sepolia
-        'network': 'Arbitrum Sepolia',
+        'chainId': 50312, // Somnia Testnet
+        'network': 'Somnia Testnet',
         'standard': 'ERC721',
         'created_at': DateTime.now().toIso8601String(),
       };
@@ -238,7 +238,7 @@ class SimpleNFTService {
       
       final result = await _appKitModal!.request(
         topic: _appKitModal!.session!.topic!,
-        chainId: 'eip155:${_appKitModal!.selectedChain?.chainId ?? "421614"}',
+        chainId: 'eip155:${_appKitModal!.selectedChain?.chainId ?? "50312"}',
         request: SessionRequestParams(
           method: 'eth_sendTransaction',
           params: [deployParams],
@@ -476,7 +476,7 @@ class SimpleNFTService {
       // Send transaction request to MetaMask - this WILL trigger popup
       final result = await _appKitModal!.request(
         topic: _appKitModal!.session!.topic!,
-        chainId: 'eip155:421614', // Force Arbitrum Sepolia
+        chainId: 'eip155:50312', // Force Somnia Testnet
         request: SessionRequestParams(
           method: 'eth_sendTransaction',
           params: [transactionParams],
@@ -511,9 +511,9 @@ class SimpleNFTService {
           debugPrint('🎉 NFT TRANSACTION SUCCESSFUL!');
           debugPrint('🎉 ═══════════════════════════════════════════════════════');
           debugPrint('🎉 Transaction Hash: $txHash');
-          debugPrint('🎉 View on Arbiscan: https://sepolia.arbiscan.io/tx/$txHash');
+          debugPrint('🎉 View on Explorer: https://shannon-explorer.somnia.network/tx/$txHash');
           debugPrint('🎉 Contract Address: $boundaryNFTContractAddress');
-          debugPrint('🎉 Network: Arbitrum Sepolia (Chain ID: 421614)');
+          debugPrint('🎉 Network: Somnia Testnet (Chain ID: 50312)');
           debugPrint('🎉 ');
           debugPrint('🎉 🎯 IMPORTANT: CHECK YOUR METAMASK WALLET!');
           debugPrint('🎉 1. Open MetaMask mobile/extension');
@@ -521,7 +521,7 @@ class SimpleNFTService {
           debugPrint('🎉 3. Look for your new NFT: "$nftName"');
           debugPrint('🎉 4. If not visible, tap "Import NFT" and use:');
           debugPrint('🎉    - Contract: $boundaryNFTContractAddress');
-          debugPrint('🎉    - Network: Arbitrum Sepolia');
+          debugPrint('🎉    - Network: somnia testnet');
           debugPrint('🎉 ');
           debugPrint('🎉 🔍 VERIFY TRANSACTION:');
           debugPrint('🎉 • Arbiscan: https://sepolia.arbiscan.io/tx/$txHash');
@@ -539,7 +539,7 @@ class SimpleNFTService {
             debugPrint('🎯 ═══════════════════════════════════════════════════════');
             debugPrint('🎯 Contract Address: $boundaryNFTContractAddress');
             debugPrint('🎯 Token ID: $tokenId');
-            debugPrint('🎯 Network: Arbitrum Sepolia (Chain ID: 421614)');
+            debugPrint('🎯 Network: Somnia Testnet (Chain ID: 50312)');
             debugPrint('🎯 ');
             debugPrint('🎯 🚀 ATTEMPTING AUTOMATIC NFT IMPORT TO METAMASK...');
             debugPrint('🎯 📱 A popup will appear in MetaMask asking to add the NFT');
@@ -610,12 +610,12 @@ class SimpleNFTService {
             'message': '🎉 NFT Transaction Submitted! Verification complete.',
             'metadata': metadata,
             'contractAddress': boundaryNFTContractAddress,
-            'explorerUrl': 'https://sepolia.arbiscan.io/tx/$txHash',
+            'explorerUrl': 'https://shannon-explorer.somnia.network/tx/$txHash',
             'tokenId': tokenId,
             'verification': finalVerificationResult,
             'instructions': _generateUserInstructions(finalVerificationResult, tokenId),
-            'network': 'Arbitrum Sepolia',
-            'chainId': '421614',
+            'network': 'Somnia Testnet',
+            'chainId': '50312',
           };
         } else {
           debugPrint('🎨 ⚠️  No transaction hash found, but transaction was sent');
@@ -655,8 +655,8 @@ class SimpleNFTService {
       debugPrint('🔍 ═══════════════════════════════════════════════════════');
       debugPrint('🔍 Transaction Hash: $transactionHash');
       
-      // Create Web3 client for Arbitrum Sepolia
-      final client = Web3Client('https://sepolia-rollup.arbitrum.io/rpc', http.Client());
+      // Create Web3 client for Somnia Testnet
+      final client = Web3Client('https://dream-rpc.somnia.network', http.Client());
       
       // Poll for receipt with retry logic
       TransactionReceipt? receipt;
@@ -795,7 +795,7 @@ class SimpleNFTService {
         };
       }
       
-      final client = Web3Client('https://sepolia-rollup.arbitrum.io/rpc', http.Client());
+      final client = Web3Client('https://dream-rpc.somnia.network', http.Client());
       
       try {
         // Create contract instance with minimal ABI for ownerOf and tokenURI
@@ -862,7 +862,7 @@ class SimpleNFTService {
           'tokenURI': tokenURI,
           'metadata': metadataResult,
           'contractAddress': boundaryNFTContractAddress,
-          'network': 'Arbitrum Sepolia',
+          'network': 'somnia testnet',
           'explorerUrl': 'https://sepolia.arbiscan.io/token/$boundaryNFTContractAddress?a=$tokenId',
         };
         
@@ -1024,7 +1024,7 @@ class SimpleNFTService {
       // This triggers a popup in MetaMask asking user to add the NFT
       final result = await _appKitModal!.request(
         topic: _appKitModal!.session!.topic!,
-        chainId: 'eip155:421614', // Arbitrum Sepolia
+        chainId: 'eip155:50312', // Somnia Testnet
         request: SessionRequestParams(
           method: 'wallet_watchAsset',
           params: [
@@ -1069,8 +1069,8 @@ class SimpleNFTService {
         debugPrint('💡 MetaMask version too old - wallet_watchAsset not supported');
         debugPrint('💡 Please update MetaMask to version 10.30+ for automatic NFT import');
       } else if (e.toString().contains('Network')) {
-        debugPrint('💡 Network issue - make sure you\'re on Arbitrum Sepolia');
-        debugPrint('💡 Switch to Arbitrum Sepolia network in MetaMask');
+        debugPrint('💡 Network issue - make sure you\'re on somnia testnet');
+        debugPrint('💡 Switch to somnia testnet network in MetaMask');
       } else {
         debugPrint('💡 Unknown error - manual import may be needed');
       }
@@ -1089,7 +1089,7 @@ class SimpleNFTService {
       debugPrint('🎯 ');
       debugPrint('🎯 INSTRUCTIONS FOR USER:');
       debugPrint('🎯 1. Open MetaMask mobile app or browser extension');
-      debugPrint('🎯 2. Make sure you are on Arbitrum Sepolia network');
+      debugPrint('🎯 2. Make sure you are on somnia testnet network');
       debugPrint('🎯 3. Go to "NFTs" or "Collectibles" tab');
       debugPrint('🎯 4. Tap "Import NFT" or "Import NFTs"');
       debugPrint('🎯 5. Enter Contract Address: $contractAddress');
@@ -1191,11 +1191,11 @@ class SimpleNFTService {
       debugPrint('🛠️ 5. Manual MetaMask import:');
       debugPrint('🛠️    Contract: $contractAddress');
       debugPrint('🛠️    Token ID: $tokenId');
-      debugPrint('🛠️    Network: Arbitrum Sepolia');
+      debugPrint('🛠️    Network: Somnia Testnet');
     }
     
     debugPrint('🛠️ 6. RPC endpoint for testing:');
-    debugPrint('🛠️    https://sepolia-rollup.arbitrum.io/rpc');
+    debugPrint('🛠️    https://dream-rpc.somnia.network');
     
     debugPrint('🛠️ ═══════════════════════════════════════════════════════');
   }
@@ -1212,9 +1212,9 @@ class SimpleNFTService {
       'contractAddress': boundaryNFTContractAddress,
       'walletAddress': walletAddress,
       'tokenId': tokenId,
-      'network': 'Arbitrum Sepolia',
-      'chainId': 421614,
-      'explorerUrl': 'https://sepolia.arbiscan.io/tx/$txHash',
+      'network': 'Somnia Testnet',
+      'chainId': 50312,
+      'explorerUrl': 'https://shannon-explorer.somnia.network/tx/$txHash',
     };
 
     try {

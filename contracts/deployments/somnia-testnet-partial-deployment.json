@@ -1,0 +1,25 @@
+{
+  "network": "somniaTestnet",
+  "deployer": "0x1570a891556eF3A181658EaD5AA409B21C7Cd42d",
+  "chainId": 50312,
+  "deployedAt": "2025-09-12T00:00:00.000Z",
+  "status": "Partial - ClaimVerification pending due to insufficient balance",
+  "contracts": {
+    "EventFactory": "0xf51E6200829Ae27f6374662De4b1239745A59f0E",
+    "BoundaryNFT": "0xf7bECe16CC3182C1890eC722cbd0E29aC61F888D",
+    "ClaimVerification": "NOT_DEPLOYED - Insufficient balance"
+  },
+  "rpcUrl": "https://dream-rpc.somnia.network",
+  "explorerUrl": "https://shannon-explorer.somnia.network",
+  "currency": "STT",
+  "deploymentNotes": {
+    "EventFactory": "Successfully deployed",
+    "BoundaryNFT": "Successfully deployed with EventFactory address as constructor argument",
+    "ClaimVerification": "Failed to deploy due to insufficient STT balance (0.23783332 STT remaining)"
+  },
+  "nextSteps": [
+    "Fund wallet with more STT tokens from https://testnet.somnia.network/",
+    "Deploy remaining ClaimVerification contract",
+    "Update Flutter app with deployed contract addresses"
+  ]
+}

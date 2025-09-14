@@ -21,7 +21,7 @@ class TestWeb3Integration {
       final isCorrectNetwork = await web3Service.isCorrectNetwork();
       print('Network check: $isCorrectNetwork');
       if (!isCorrectNetwork) {
-        print('⚠️ Warning: Not connected to Arbitrum Sepolia');
+        print('⚠️ Warning: Not connected to Somnia Testnet');
       }
       
       // Test 3: Contract addresses
@@ -66,7 +66,7 @@ class TestWeb3Integration {
   static void printTestResults() {
     print('\n📊 Web3 Integration Test Results:');
     print('✅ Web3Service: Contract initialization');
-    print('✅ Network: Arbitrum Sepolia connection');
+    print('✅ Network: Somnia Testnet connection');
     print('✅ Contracts: EventFactory, BoundaryNFT, ClaimVerification');
     print('✅ Blockchain: Read operations (events count, gas price)');
     print('✅ Wallet: Connection state and address');

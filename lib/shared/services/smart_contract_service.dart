@@ -5,14 +5,14 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 class SmartContractService {
-  // Contract addresses on Arbitrum Sepolia Testnet (UPDATED - Latest Deployment)
-  static const String eventFactoryAddress = "0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d";
-  static const String boundaryNFTAddress = "0xC585B8e492210FbEDbFE8BB353366DC968c9F77A";
-  static const String claimVerificationAddress = "0xed4468D5f1247dfD6BD19Dd54BD91278B647d6Aa";
+  // Contract addresses on Somnia Testnet (to be deployed)
+  static const String eventFactoryAddress = "0x1F2F71fa673a38CBC5848985A74713bDfB584578";
+  static const String boundaryNFTAddress = "0x8C62160ABfBac5B2d20FbD0bac63D1125E4eB391";
+  static const String claimVerificationAddress = "0xB101AD9036750B5321b23F9700CE9A6d9BF2685B";
   
   // Network configuration
-  static const String rpcUrl = "https://sepolia-rollup.arbitrum.io/rpc";
-  static const int chainId = 421614; // Arbitrum Sepolia Testnet
+  static const String rpcUrl = "https://dream-rpc.somnia.network";
+  static const int chainId = 50312; // Somnia Testnet
   
   ReownAppKitModal? _appKitModal;
   
@@ -450,11 +450,11 @@ class SmartContractService {
   /// Get network information
   Map<String, dynamic> getNetworkInfo() {
     return {
-      'name': 'Arbitrum Sepolia Testnet',
+      'name': 'Somnia Testnet',
       'rpcUrl': rpcUrl,
       'chainId': chainId,
-      'currencySymbol': 'ETH',
-      'explorerUrl': 'https://sepolia.arbiscan.io',
+      'currencySymbol': 'STT',
+      'explorerUrl': 'https://shannon-explorer.somnia.network/',
     };
   }
 }

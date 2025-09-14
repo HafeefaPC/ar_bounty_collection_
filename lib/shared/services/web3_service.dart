@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 
 class Web3Service {
-  static const String _arbitrumSepoliaRpcUrl = 'https://sepolia-rollup.arbitrum.io/rpc';
-  static const int _chainId = 421614;
+  static const String _somniaTestnetRpcUrl = 'https://dream-rpc.somnia.network';
+  static const int _chainId = 50312;
   
   late Web3Client _client;
   late EthereumAddress _eventFactoryAddress;
@@ -18,20 +18,20 @@ class Web3Service {
   late DeployedContract _claimVerificationContract;
   
   Web3Service() {
-    _client = Web3Client(_arbitrumSepoliaRpcUrl, http.Client());
+    _client = Web3Client(_somniaTestnetRpcUrl, http.Client());
     _loadContractAddresses();
   }
   
   void _loadContractAddresses() {
-    // Load contract addresses from the new deployment (NO ROLE RESTRICTIONS)
-    _eventFactoryAddress = EthereumAddress.fromHex('0x465865E0bFA28d7794fC103b57fd089656872907');
-    _boundaryNFTAddress = EthereumAddress.fromHex('0xDF4FD714E5077eb28F0AeFe654b7d08dc9eBe617');
-    _claimVerificationAddress = EthereumAddress.fromHex('0x8C6cb26c18D79D158502D117e9F3d2fD04a28790');
+    // Load contract addresses for Somnia Testnet (UPDATED - Match deployment status)
+    _eventFactoryAddress = EthereumAddress.fromHex('0x1F2F71fa673a38CBC5848985A74713bDfB584578');
+    _boundaryNFTAddress = EthereumAddress.fromHex('0x0000000000000000000000000000000000000000'); // Not deployed yet
+    _claimVerificationAddress = EthereumAddress.fromHex('0x80FF10046dc3082A6925F04DE51102ebFB3f9EC6');
     
-    print('✅ Web3Service: Loaded NEW contract addresses (no role restrictions):');
-    print('  - EventFactory: ${_eventFactoryAddress.hex}');
-    print('  - BoundaryNFT: ${_boundaryNFTAddress.hex}');
-    print('  - ClaimVerification: ${_claimVerificationAddress.hex}');
+    print('✅ Web3Service: Loaded Somnia Testnet contract addresses (UPDATED):');
+    print('  - EventFactory: ${_eventFactoryAddress.hex} ✅ DEPLOYED');
+    print('  - BoundaryNFT: ${_boundaryNFTAddress.hex} ⏳ PENDING');
+    print('  - ClaimVerification: ${_claimVerificationAddress.hex} ✅ DEPLOYED');
   }
   
   Future<void> initializeContracts() async {
@@ -71,7 +71,7 @@ class Web3Service {
   int get chainId => _chainId;
   
   // Get the RPC URL
-  String get rpcUrl => _arbitrumSepoliaRpcUrl;
+  String get rpcUrl => _somniaTestnetRpcUrl;
   
   // Get contract addresses
   EthereumAddress get eventFactoryAddress => _eventFactoryAddress;
@@ -188,7 +188,7 @@ class Web3Service {
       
       print('✅ Web3Service: Event creation transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -356,19 +356,38 @@ class Web3Service {
   // Wait for transaction confirmation
   Future<TransactionReceipt?> waitForTransactionConfirmation(String txHash) async {
     try {
-      // Poll for transaction receipt
+      print('⏳ Web3Service: Waiting for transaction confirmation...');
+      print('📝 Transaction Hash: $txHash');
+      
+      // Poll for transaction receipt with longer timeout for Somnia Testnet
       TransactionReceipt? receipt;
       int attempts = 0;
-      const maxAttempts = 30; // 30 seconds timeout
+      const maxAttempts = 60; // 60 seconds timeout (increased from 30)
       
       while (receipt == null && attempts < maxAttempts) {
         await Future.delayed(const Duration(seconds: 1));
         try {
           receipt = await _client.getTransactionReceipt(txHash);
+          if (receipt != null) {
+            print('✅ Web3Service: Transaction confirmed!');
+            print('📋 Block Number: ${receipt.blockNumber}');
+            print('📋 Gas Used: ${receipt.gasUsed}');
+            print('📋 Status: ${receipt.status}');
+            break;
+          }
         } catch (e) {
           // Transaction not yet mined, continue waiting
+          if (attempts % 10 == 0) { // Log every 10 seconds
+            print('⏳ Web3Service: Still waiting for confirmation... (${attempts + 1}s)');
+          }
         }
         attempts++;
+      }
+      
+      if (receipt == null) {
+        print('⚠️ Web3Service: Transaction confirmation timeout after ${maxAttempts} seconds');
+        print('⚠️ Transaction may still be pending on the network');
+        print('🔗 Check on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       }
       
       return receipt;
@@ -635,7 +654,7 @@ class Web3Service {
       
       print('✅ Web3Service: NFT claiming transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -733,7 +752,7 @@ class Web3Service {
       
       print('✅ Web3Service: NFT minting transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -824,7 +843,7 @@ class Web3Service {
       
       print('✅ Web3Service: Location claim transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {

@@ -108,8 +108,8 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
         // CRITICAL: Check if we're on the wrong network
         final chainId = walletState.chainId?.replaceAll('eip155:', '') ?? '';
         
-        if (chainId != '421614') {
-          debugPrint('Connected to wrong network: $chainId, attempting to switch to Arbitrum Sepolia');
+        if (chainId != '50312') {
+          debugPrint('Connected to wrong network: $chainId, attempting to switch to Somnia Testnet');
           
           // Show network switch dialog
           _showNetworkSwitchDialog(chainId);
@@ -131,7 +131,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
           
           if (success) {
             debugPrint('Wallet connected successfully: $_walletAddress');
-            _showSuccess('Wallet connected successfully on Arbitrum Sepolia!');
+            _showSuccess('Wallet connected successfully on Somnia Testnet!');
           } else {
             debugPrint('Wallet connected but database save failed: $_walletAddress');
             _showWarning('Wallet connected! Some features may be limited due to sync issues.');
@@ -274,12 +274,9 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
     }
   }
 
-  void _skipWalletConnection() {
-    context.go('/wallet/options');
-  }
 
   void _continueWithWallet() {
-    context.go('/wallet/options');
+    context.go('/main');
   }
 
   @override
@@ -351,7 +348,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                         decoration: AppTheme.modernGlassEffect,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: AppTheme.primaryGradient,
+                            color: AppTheme.primaryColor,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Icon(
@@ -600,53 +597,11 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                           ),
                         ),
 
-                      SizedBox(height: screenHeight * 0.03),
-
-                      // Modern Skip Button
-                      TextButton(
-                        onPressed: _skipWalletConnection,
-                        style: AppTheme.modernTextButton,
-                        child: Text(
-                          'Skip for now',
-                          style: AppTheme.modernButton.copyWith(
-                            fontSize: screenWidth * 0.04,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                      ),
 
                       SizedBox(height: screenHeight * 0.05),
 
                       // Modern Info Section
-                      Container(
-                        padding: EdgeInsets.all(screenWidth * 0.05),
-                        decoration: AppTheme.modernContainerDecoration,
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(screenWidth * 0.03),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accentColor.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.info_outline_rounded,
-                                color: AppTheme.accentColor,
-                                size: screenWidth * 0.06,
-                              ),
-                            ),
-                            SizedBox(width: screenWidth * 0.04),
-                            Expanded(
-                              child: Text(
-                                'Secure wallet connection powered by WalletConnect. Your keys remain in your wallet at all times.',
-                                style: AppTheme.modernBodySecondary.copyWith(
-                                  fontSize: screenWidth * 0.04,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                     
 
                       SizedBox(height: screenHeight * 0.05),
                     ],
@@ -729,7 +684,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'You\'re connected to ${_getChainName(currentChainId)} but this app requires Arbitrum Sepolia testnet.',
+              'You\'re connected to ${_getChainName(currentChainId)} but this app requires somnia testnet.',
               style: const TextStyle(
                 fontSize: 16,
                 color: AppTheme.textSecondary,
@@ -756,21 +711,21 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Arbitrum Sepolia Testnet',
+                    'Somnia Testnet',
                     style: TextStyle(
                       fontSize: 16,
                       color: AppTheme.textColor,
                     ),
                   ),
                   Text(
-                    'Chain ID: 421614',
+                    'Chain ID: 50312',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppTheme.textSecondary,
                     ),
                   ),
                   Text(
-                    'RPC: https://sepolia-rollup.arbitrum.io/rpc',
+                    'RPC: https://dream-rpc.somnia.network',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondary,
@@ -781,7 +736,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
             ),
             const SizedBox(height: 16),
             const Text(
-              'Please switch to Arbitrum Sepolia in your wallet or add it as a custom network.',
+              'Please switch to Somnia Testnet in your wallet or add it as a custom network.',
               style: TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
@@ -819,13 +774,13 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
   // Add this method to attempt network switching
   Future<void> _attemptNetworkSwitch() async {
     try {
-      debugPrint('Attempting to switch to Arbitrum Sepolia...');
+      debugPrint('Attempting to switch to somnia testnet...');
       
       // Try to switch using the wallet connection provider
-      final success = await ref.read(walletConnectionProvider.notifier).switchToArbitrumSepolia();
+      final success = await ref.read(walletConnectionProvider.notifier).switchToSomniaTestnet();
       
       if (success) {
-        _showSuccess('Successfully switched to Arbitrum Sepolia!');
+        _showSuccess('Successfully switched to Somnia Testnet!');
       } else {
         // If automatic switch fails, show manual instructions
         _showManualNetworkInstructions();
@@ -862,7 +817,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Please add Arbitrum Sepolia manually to your wallet:',
+                'Please add Somnia Testnet manually to your wallet:',
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.textSecondary,
@@ -879,11 +834,11 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _NetworkDetailRow('Network Name:', 'Arbitrum Sepolia'),
-                    _NetworkDetailRow('RPC URL:', 'https://sepolia-rollup.arbitrum.io/rpc'),
-                    _NetworkDetailRow('Chain ID:', '421614'),
-                    _NetworkDetailRow('Currency Symbol:', 'ETH'),
-                    _NetworkDetailRow('Explorer:', 'https://sepolia.arbiscan.io'),
+                    _NetworkDetailRow('Network Name:', 'Somnia Testnet'),
+                    _NetworkDetailRow('RPC URL:', 'https://dream-rpc.somnia.network'),
+                    _NetworkDetailRow('Chain ID:', '50312'),
+                    _NetworkDetailRow('Currency Symbol:', 'STT'),
+                    _NetworkDetailRow('Explorer:', 'https://shannon-explorer.somnia.network'),
                   ],
                 ),
               ),
@@ -919,10 +874,10 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
     switch (chainId) {
       case '1':
         return 'Ethereum Mainnet';
-      case '42161':
-        return 'Arbitrum One';
-      case '421614':
-        return 'Arbitrum Sepolia';
+      case '5031':
+        return 'Somnia Mainnet';
+      case '50312':
+        return 'Somnia Testnet';
       case '137':
         return 'Polygon';
       case '56':

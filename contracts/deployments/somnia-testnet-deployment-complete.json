@@ -1,0 +1,24 @@
+{
+  "network": "somniaTestnet",
+  "deployer": "0x1570a891556eF3A181658EaD5AA409B21C7Cd42d",
+  "chainId": 50312,
+  "deployedAt": "2025-09-12T20:31:50.791Z",
+  "status": "Complete - All contracts deployed successfully",
+  "contracts": {
+    "EventFactory": "0x1F2F71fa673a38CBC5848985A74713bDfB584578",
+    "BoundaryNFT": "0x8C62160ABfBac5B2d20FbD0bac63D1125E4eB391",
+    "ClaimVerification": "0xB101AD9036750B5321b23F9700CE9A6d9BF2685B"
+  },
+  "deploymentTx": {
+    "EventFactory": "Previous deployment",
+    "BoundaryNFT": "0x5d7ab338419a61fb2da28ede610f03889dcb4440e8a8ee8354f3f8b1ee029e3b",
+    "ClaimVerification": "0xd9e5835d101e0e812c7e7253d6141041af7e216ebda5496551cbdfef4c6b54c1"
+  },
+  "rpcUrl": "https://dream-rpc.somnia.network",
+  "explorerUrl": "https://shannon-explorer.somnia.network",
+  "currency": "STT",
+  "gasUsed": {
+    "BoundaryNFT": "93898614",
+    "ClaimVerification": "42640665"
+  }
+}

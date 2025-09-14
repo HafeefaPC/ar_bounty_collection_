@@ -260,7 +260,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
           Container(
             padding: EdgeInsets.all(screenWidth * 0.04),
             decoration: BoxDecoration(
-              gradient: _isConnected ? AppTheme.primaryGradient : AppTheme.cardGradient,
+              color: _isConnected ? AppTheme.primaryColor : AppTheme.cardColor,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -376,7 +376,7 @@ class _WalletOptionsScreenState extends ConsumerState<WalletOptionsScreen> with 
               width: screenWidth * 0.12,
               height: screenWidth * 0.12,
               decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
+                color: AppTheme.primaryColor,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(

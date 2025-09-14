@@ -283,17 +283,17 @@ class WalletConnectionStatus extends ConsumerWidget {
                     builder: (context) {
                       // Extract chain ID without eip155: prefix for comparison
                       final chainId = walletState.chainId!.replaceAll('eip155:', '');
-                      final isArbitrumSepolia = chainId == '421614';
+                      final isSomniaTestnet = chainId == '50312';
                       
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isArbitrumSepolia 
+                          color: isSomniaTestnet 
                               ? AppTheme.successColor.withOpacity(0.2)
                               : AppTheme.warningColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isArbitrumSepolia 
+                            color: isSomniaTestnet 
                                 ? AppTheme.successColor.withOpacity(0.5)
                                 : AppTheme.warningColor.withOpacity(0.5),
                             width: 1,
@@ -302,7 +302,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                         child: Text(
                           _getChainName(chainId),
                           style: AppTheme.modernBodySecondary.copyWith(
-                            color: isArbitrumSepolia 
+                            color: isSomniaTestnet 
                                 ? AppTheme.successColor
                                 : AppTheme.warningColor,
                             fontSize: 8,
@@ -323,9 +323,9 @@ class WalletConnectionStatus extends ConsumerWidget {
               builder: (context) {
                 // Extract chain ID without eip155: prefix for comparison
                 final chainId = walletState.chainId?.replaceAll('eip155:', '') ?? '';
-                final isArbitrumSepolia = chainId == '421614';
+                final isSomniaTestnet = chainId == '50312';
                 
-                if (isArbitrumSepolia) {
+                if (isSomniaTestnet) {
                   return const SizedBox.shrink(); // Don't show switch button if already on correct network
                 }
                 
@@ -351,7 +351,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      'Switching to Arbitrum Sepolia...',
+                                      'Switching to Somnia Testnet...',
                                       style: AppTheme.modernBodySecondary.copyWith(color: AppTheme.backgroundColor),
                                     ),
                                   ],
@@ -363,7 +363,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                           }
                           
                           // Attempt to switch network
-                          final success = await walletNotifier.switchToArbitrumSepolia();
+                          final success = await walletNotifier.switchToSomniaTestnet();
                           
                           // Wait for state to update
                           await Future.delayed(const Duration(seconds: 2));
@@ -374,7 +374,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(success ? 'Successfully switched to Arbitrum Sepolia!' : 'Failed to switch network. Please try manually.'),
+                                content: Text(success ? 'Successfully switched to Somnia Testnet!' : 'Failed to switch network. Please try manually.'),
                                 backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(0)),
                                 duration: const Duration(seconds: 4),
@@ -459,10 +459,10 @@ class WalletConnectionStatus extends ConsumerWidget {
     switch (chainId) {
       case '1':
         return 'ETH Mainnet';
-      case '42161':
-        return 'Arbitrum One';
-      case '421614':
-        return 'Arbitrum Sepolia';
+      case '5031':
+        return 'Somnia Mainnet';
+      case '50312':
+        return 'Somnia Testnet';
       case '137':
         return 'Polygon';
       case '56':

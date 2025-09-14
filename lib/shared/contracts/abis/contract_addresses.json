@@ -1,9 +1,9 @@
 {
-  "network": "arbitrumSepolia",
-  "chainId": 421614,
+  "network": "somniaTestnet",
+  "chainId": 50312,
   "contracts": {
-    "EventFactory": "0x2f61d477F24C16dcDe68D988BDf6447b7D0Edb79",
-    "ClaimVerification": "0x070C20Fd90d2588C12f06c68f4a67def77e0aA6F",
-    "BoundaryNFT": "0xE587360Bc94a98E43F276718E49E213f7a30CA4B"
+    "EventFactory": "0x1F2F71fa673a38CBC5848985A74713bDfB584578",
+    "ClaimVerification": "0x80FF10046dc3082A6925F04DE51102ebFB3f9EC6",
+    "BoundaryNFT": "0x0000000000000000000000000000000000000000"
   }
 }

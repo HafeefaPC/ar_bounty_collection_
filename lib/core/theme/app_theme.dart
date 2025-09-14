@@ -1,115 +1,77 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Modern Color Palette inspired by Sinport design
-  static const Color primaryColor = Color(0xFF6366F1); // Modern Indigo
-  static const Color secondaryColor = Color(0xFF8B5CF6); // Modern Purple
-  static const Color accentColor = Color(0xFF06B6D4); // Modern Cyan
-  static const Color backgroundColor = Color(0xFF0F0F23); // Deep Dark Blue
-  static const Color surfaceColor = Color(0xFF1E1E3F); // Dark Surface
-  static const Color cardColor = Color(0xFF2A2A4A); // Card Background
+  // Solid Color Palette - No Gradients
+  static const Color primaryColor = Color(0xFFFF6600); // Solid Orange
+  static const Color secondaryColor = Color(0xFFFFD700); // Solid Yellow
+  static const Color accentColor = Color(0xFF0066FF); // Solid Blue
+  static const Color backgroundColor = Color(0xFF000000); // Pure Black
+  static const Color surfaceColor = Color(0xFF1A1A1A); // Dark Gray
+  static const Color cardColor = Color(0xFF2A2A2A); // Card Background
   static const Color textColor = Color(0xFFFFFFFF); // White Text
-  static const Color textSecondary = Color(0xFF94A3B8); // Secondary Text
-  static const Color successColor = Color(0xFF10B981); // Modern Green
-  static const Color errorColor = Color(0xFFEF4444); // Modern Red
-  static const Color warningColor = Color(0xFFF59E0B); // Modern Amber
-  static const Color infoColor = Color(0xFF3B82F6); // Modern Blue
-  static const Color borderColor = Color(0xFF374151); // Border Color
+  static const Color textSecondary = Color(0xFFB0B0B0); // Light Gray Text
+  static const Color successColor = Color(0xFF0066FF); // Solid Blue
+  static const Color errorColor = Color(0xFFFF6600); // Solid Orange for errors
+  static const Color warningColor = Color(0xFFFFD700); // Solid Yellow
+  static const Color infoColor = Color(0xFF0066FF); // Solid Blue
+  static const Color borderColor = Color(0xFF404040); // Border Color
 
-  // Modern Gradients inspired by Sinport
-  static const LinearGradient primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF6366F1),
-      Color(0xFF8B5CF6),
-      Color(0xFF06B6D4),
-    ],
-    stops: [0.0, 0.5, 1.0],
-  );
+  // Solid Colors - No Gradients
+  static const Color primaryGradient = primaryColor; // Solid Orange
+  static const Color secondaryGradient = secondaryColor; // Solid Yellow
+  static const Color cardGradient = cardColor; // Solid Card Color
+  static const Color backgroundGradient = backgroundColor; // Solid Black
 
-  static const LinearGradient secondaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF8B5CF6),
-      Color(0xFF06B6D4),
-      Color(0xFF10B981),
-    ],
-    stops: [0.0, 0.5, 1.0],
-  );
-
-  static const LinearGradient cardGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFF2A2A4A),
-      Color(0xFF1E1E3F),
-    ],
-    stops: [0.0, 1.0],
-  );
-
-  static const LinearGradient backgroundGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF0F0F23),
-      Color(0xFF1E1E3F),
-      Color(0xFF0F0F23),
-    ],
-    stops: [0.0, 0.5, 1.0],
-  );
-
-  // Modern Text Styles inspired by Sinport
+  // Standard Text Styles
   static const TextStyle modernTitle = TextStyle(
-    fontFamily: 'SF Pro Display',
-    fontSize: 32,
-    fontWeight: FontWeight.w700,
+    fontFamily: 'Roboto',
+    fontSize: 24,
+    fontWeight: FontWeight.w600,
     color: textColor,
-    letterSpacing: -0.5,
+    letterSpacing: 0.0,
     height: 1.2,
   );
 
   static const TextStyle modernSubtitle = TextStyle(
-    fontFamily: 'SF Pro Display',
-    fontSize: 20,
-    fontWeight: FontWeight.w600,
+    fontFamily: 'Roboto',
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
     color: textColor,
-    letterSpacing: -0.3,
+    letterSpacing: 0.0,
     height: 1.3,
   );
 
   static const TextStyle modernBody = TextStyle(
-    fontFamily: 'SF Pro Text',
+    fontFamily: 'Roboto',
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: textColor,
-    letterSpacing: -0.2,
-    height: 1.5,
+    letterSpacing: 0.0,
+    height: 1.4,
   );
 
   static const TextStyle modernBodySecondary = TextStyle(
-    fontFamily: 'SF Pro Text',
+    fontFamily: 'Roboto',
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: textSecondary,
-    letterSpacing: -0.1,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 
   static const TextStyle modernButton = TextStyle(
-    fontFamily: 'SF Pro Display',
+    fontFamily: 'Roboto',
     fontSize: 16,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     color: textColor,
-    letterSpacing: -0.2,
-    height: 1.2,
+    letterSpacing: 0.0,
+    height: 1.0,
   );
 
   static const TextStyle modernCaption = TextStyle(
-    fontFamily: 'SF Pro Text',
+    fontFamily: 'Roboto',
     fontSize: 12,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w400,
     color: textSecondary,
     letterSpacing: 0.0,
     height: 1.3,
@@ -229,9 +191,9 @@ class AppTheme {
     );
   }
 
-  // Modern Card Decoration inspired by Sinport
+  // Modern Card Decoration
   static BoxDecoration modernCardDecoration = BoxDecoration(
-    gradient: cardGradient,
+    color: cardColor,
     borderRadius: BorderRadius.circular(20),
     border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
     boxShadow: [
@@ -285,7 +247,7 @@ class AppTheme {
 
   // Modern Scaffold Background
   static const BoxDecoration modernScaffoldBackground = BoxDecoration(
-    gradient: backgroundGradient,
+    color: backgroundColor,
   );
 
   // Modern Glow Effect

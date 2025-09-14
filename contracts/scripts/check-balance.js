@@ -18,7 +18,7 @@ async function main() {
   if (balance < minBalance) {
     console.log("⚠️  Warning: Balance is low. You need at least 0.01 ETH for deployment.");
     console.log("Please fund your wallet with some ETH from a faucet:");
-    console.log("https://faucet.arbitrum.io/");
+  
   } else {
     console.log("✅ Balance is sufficient for deployment.");
   }
