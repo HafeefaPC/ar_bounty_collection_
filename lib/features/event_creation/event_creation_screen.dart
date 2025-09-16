@@ -1918,9 +1918,8 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         'to': walletState.walletAddress!.toLowerCase(), // Send to self
         'data': '0x', // Empty data - simple transfer
         'from': walletState.walletAddress!.toLowerCase(),
-        'gas': '0x${(21000).toRadixString(16)}', // Standard gas limit for ETH transfer
-        'gasPrice': '0x${(1000000000).toRadixString(16)}', // 1 gwei
         'value': '0x0', // No ETH being sent - just test the flow
+        // Let wallet estimate gas for Somnia Testnet
       };
       
       print('🧪 Test transaction parameters:');
@@ -1934,7 +1933,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       print('🔗 Sending request to wallet...');
       final result = await reownAppKit.request(
         topic: walletState.sessionTopic!,
-        chainId: 'eip155:421614',
+        chainId: 'eip155:50312',
         request: SessionRequestParams(
           method: 'eth_sendTransaction',
           params: [transactionParams],
@@ -1980,16 +1979,39 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
           }
         }
         
+        // MetaMask style: { jsonrpc, id, result: '0x...' }
+        if (result.containsKey('result') && result['result'] is String) {
+          final res = result['result'];
+          if (res.startsWith('0x') && res.length == 66) {
+            transactionHash = res;
+            print('✅ Found tx hash in result field: $transactionHash');
+          }
+        }
+        
+        // WalletConnect payload nesting: { payload: { result: '0x...' } }
+        if (transactionHash == null && result.containsKey('payload') && result['payload'] is Map) {
+          final payload = result['payload'];
+          if (payload['result'] is String) {
+            final res = payload['result'];
+            if (res.startsWith('0x') && res.length == 66) {
+              transactionHash = res;
+              print('✅ Found tx hash in payload.result: $transactionHash');
+            }
+          }
+        }
+        
         // Try multiple possible keys for the transaction hash
-        final possibleKeys = ['hash', 'transactionHash', 'txHash', 'tx_hash'];
-        for (final key in possibleKeys) {
-          if (result.containsKey(key)) {
-            final hash = result[key];
-            print('📝 Found key "$key" with value: $hash (${hash.runtimeType})');
-            if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-              transactionHash = hash;
-              print('✅ Found valid transaction hash from key "$key": $transactionHash');
-              break;
+        if (transactionHash == null) {
+          final possibleKeys = ['hash', 'transactionHash', 'txHash', 'tx_hash'];
+          for (final key in possibleKeys) {
+            if (result.containsKey(key)) {
+              final hash = result[key];
+              print('📝 Found key "$key" with value: $hash (${hash.runtimeType})');
+              if (hash is String && hash.startsWith('0x') && hash.length == 66) {
+                transactionHash = hash;
+                print('✅ Found valid transaction hash from key "$key": $transactionHash');
+                break;
+              }
             }
           }
         }
@@ -2000,9 +2022,29 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
         if (firstItem is String && firstItem.startsWith('0x') && firstItem.length == 66) {
           transactionHash = firstItem;
           print('✅ Found valid transaction hash from list: $transactionHash');
+        } else if (firstItem is Map) {
+          for (final key in ['hash', 'transactionHash', 'txHash', 'result']) {
+            final hash = firstItem[key];
+            if (hash is String && hash.startsWith('0x') && hash.length == 66) {
+              transactionHash = hash;
+              print('✅ Found tx hash in list item $key: $transactionHash');
+              break;
+            }
+          }
         }
       } else {
         print('📝 Result is of unexpected type: ${result.runtimeType}');
+      }
+      
+      // Last-resort extraction: search any 0x-prefixed 32-byte hash in stringified result
+      if (transactionHash == null && result != null) {
+        final serialized = result.toString();
+        print('🔍 Searching for tx hash in serialized result: $serialized');
+        final match = RegExp(r'0x[a-fA-F0-9]{64}').firstMatch(serialized);
+        if (match != null) {
+          transactionHash = match.group(0);
+          print('🧩 Extracted tx hash via regex from payload: $transactionHash');
+        }
       }
       
       if (transactionHash != null) {
@@ -2114,12 +2156,17 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
     
     // Extract chain ID without eip155: prefix for comparison
     final currentChainId = updatedWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-    if (currentChainId != '421614') {
-      print('⚠️ Wrong chain detected. Current: ${updatedWalletState.chainId} (parsed: $currentChainId), Expected: 421614');
+    print('🔍 Wallet Chain ID Check:');
+    print('  - Raw chainId: ${updatedWalletState.chainId}');
+    print('  - Parsed chainId: $currentChainId');
+    print('  - Expected: 50312 (Somnia Testnet)');
+    
+    if (currentChainId != '50312') {
+      print('⚠️ Wrong chain detected. Current: ${updatedWalletState.chainId} (parsed: $currentChainId), Expected: 50312');
       
       // Try to automatically switch
-      print('🔄 Attempting to switch to Arbitrum Sepolia...');
-      final switched = await walletNotifier.switchToArbitrumSepolia();
+      print('🔄 Attempting to switch to Somnia Testnet...');
+      final switched = await walletNotifier.switchToSomniaTestnet();
       
       if (!switched) {
         print('❌ Automatic switch failed, showing manual instructions');
@@ -2141,7 +2188,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
       print('Chain ID: ${finalWalletState.chainId}');
       
       final finalChainId = finalWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-      if (finalChainId != '421614') {
+      if (finalChainId != '50312') {
         print('❌ Chain switch still failed after automatic attempt');
         _showRetroError('Chain switch failed. Please manually switch to Arbitrum Sepolia in your wallet settings.');
         return;
@@ -2357,8 +2404,8 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
             
             // Use the updated wallet state from the beginning of the method
             final transactionChainId = updatedWalletState.chainId?.replaceAll('eip155:', '') ?? '';
-            if (transactionChainId != '421614') {
-              throw Exception('Wrong network. Please switch to Arbitrum Sepolia (Chain ID: 421614)');
+            if (transactionChainId != '50312') {
+              throw Exception('Wrong network. Please switch to Somnia Testnet (Chain ID: 50312)');
             }
             
             // Validate transaction data
@@ -2377,14 +2424,13 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               transactionData = '0x$transactionData';
             }
             
-            // Create transaction parameters with proper formatting for WalletConnect CAIP-2
+            // Create transaction parameters - let wallet handle gas estimation
             final transactionParams = {
               'to': to.toLowerCase(), // Ensure lowercase address
               'data': transactionData, // Properly formatted hex data
               'from': updatedWalletState.walletAddress!.toLowerCase(), // Use updated wallet state
-              'gas': '0x${(1500000).toRadixString(16)}', // Significantly increased gas limit for event creation
-              'gasPrice': '0x${(3000000000).toRadixString(16)}', // Increased to 3 gwei for better inclusion
               'value': '0x0', // No ETH being sent
+              // Let wallet estimate gas and gasPrice for Somnia Testnet
             };
             
             print('📋 Transaction params: $transactionParams');
@@ -2422,7 +2468,7 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
               // Use ReownAppKit to sign and send the transaction
               final result = await reownAppKit.request(
                 topic: updatedWalletState.sessionTopic!,
-                chainId: 'eip155:$transactionChainId', // Use clean chain ID (421614)
+                chainId: 'eip155:$transactionChainId', // Use clean chain ID (50312)
                 request: SessionRequestParams(
                   method: 'eth_sendTransaction',
                   params: [transactionParams],
@@ -2445,25 +2491,48 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 print('📝 Result is String: $result');
                 if (result.startsWith('0x') && result.length == 66) {
                   transactionHash = result;
-                } else {
-                  print('⚠️ String result doesn\'t look like a transaction hash');
                 }
               } else if (result is Map) {
                 print('📝 Result is Map: $result');
-                if (result.containsKey('hash')) {
-                  final hash = result['hash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
+                print('📝 Map keys: ${result.keys.toList()}');
+                
+                // MetaMask style: { jsonrpc, id, result: '0x...' }
+                if (result.containsKey('result') && result['result'] is String) {
+                  final res = result['result'];
+                  if (res.startsWith('0x') && res.length == 66) {
+                    transactionHash = res;
+                    print('✅ Found tx hash in result field: $transactionHash');
                   }
-                } else if (result.containsKey('transactionHash')) {
-                  final hash = result['transactionHash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
+                }
+                
+                // WalletConnect payload nesting: { payload: { result: '0x...' } }
+                if (transactionHash == null && result.containsKey('payload') && result['payload'] is Map) {
+                  final payload = result['payload'];
+                  if (payload['result'] is String) {
+                    final res = payload['result'];
+                    if (res.startsWith('0x') && res.length == 66) {
+                      transactionHash = res;
+                      print('✅ Found tx hash in payload.result: $transactionHash');
+                    }
                   }
-                } else if (result.containsKey('txHash')) {
-                  final hash = result['txHash'];
-                  if (hash is String && hash.startsWith('0x') && hash.length == 66) {
-                    transactionHash = hash;
+                }
+                
+                // Common keys from various wallets/providers
+                if (transactionHash == null) {
+                  final possibleKeys = [
+                    'hash',
+                    'transactionHash',
+                    'txHash',
+                  ];
+                  for (final key in possibleKeys) {
+                    if (result.containsKey(key)) {
+                      final value = result[key];
+                      if (value is String && value.startsWith('0x') && value.length == 66) {
+                        transactionHash = value;
+                        print('✅ Found tx hash in $key field: $transactionHash');
+                        break;
+                      }
+                    }
                   }
                 }
               } else if (result is List && result.isNotEmpty) {
@@ -2471,6 +2540,26 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 final firstItem = result.first;
                 if (firstItem is String && firstItem.startsWith('0x') && firstItem.length == 66) {
                   transactionHash = firstItem;
+                } else if (firstItem is Map) {
+                  for (final key in ['hash', 'transactionHash', 'txHash', 'result']) {
+                    final hash = firstItem[key];
+                    if (hash is String && hash.startsWith('0x') && hash.length == 66) {
+                      transactionHash = hash;
+                      print('✅ Found tx hash in list item $key: $transactionHash');
+                      break;
+                    }
+                  }
+                }
+              }
+
+              // Last-resort extraction: search any 0x-prefixed 32-byte hash in stringified result
+              if (transactionHash == null && result != null) {
+                final serialized = result.toString();
+                print('🔍 Searching for tx hash in serialized result: $serialized');
+                final match = RegExp(r'0x[a-fA-F0-9]{64}').firstMatch(serialized);
+                if (match != null) {
+                  transactionHash = match.group(0);
+                  print('🧩 Extracted tx hash via regex from payload: $transactionHash');
                 }
               }
               
@@ -2479,13 +2568,11 @@ class _EventCreationScreenState extends ConsumerState<EventCreationScreen> {
                 return transactionHash;
               } else {
                 print('❌ Could not extract transaction hash from result: $result');
-                // Check if the result indicates the transaction was sent but response was lost
+                // If we have a non-empty response, surface a clearer message
                 if (result != null && result.toString().isNotEmpty) {
-                  print('⚠️ Transaction may have been sent but response format is unexpected');
-                  throw Exception('Transaction was sent but response format is unexpected. Please check your wallet for the transaction status.');
-                } else {
-                  throw Exception('Transaction failed - no response received from wallet.');
+                  throw Exception('Transaction was sent but returned an unexpected format. Please check your wallet activity for the tx hash.');
                 }
+                throw Exception('Transaction failed - no response received from wallet.');
               }
               
             } catch (e) {

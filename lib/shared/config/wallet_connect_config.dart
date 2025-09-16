@@ -17,11 +17,13 @@ class WalletConnectConfig {
   
   // Supported chains
   static const List<String> requiredChains = [
-    'eip155:421614', // Avalanche Fuji testnet (primary)
+    'eip155:50312', // Somnia Testnet (primary)
   ];
   
   static const List<String> optionalChains = [
-    'eip155:42161', // Arbitrum One (MAINNET) 
+    'eip155:5031', // Somnia Mainnet
+    'eip155:421614', // Arbitrum Sepolia (legacy)
+    'eip155:42161', // Arbitrum One (legacy)
   ];
   
   // Required methods for the app
@@ -43,8 +45,26 @@ class WalletConnectConfig {
     'accountsChanged',
   ];
 
-  
- static const Map<String, dynamic> arbitrumSepoliaConfig = {
+  // Somnia Testnet configuration
+  static const Map<String, dynamic> somniaTestnetConfig = {
+    'chainId': '50312',
+    'name': 'Somnia Testnet',
+    'currency': 'STT',
+    'rpcUrl': 'https://dream-rpc.somnia.network',
+    'explorerUrl': 'https://shannon-explorer.somnia.network/',
+  };
+
+  // Somnia Mainnet configuration
+  static const Map<String, dynamic> somniaMainnetConfig = {
+    'chainId': '5031',
+    'name': 'Somnia Mainnet',
+    'currency': 'SOMI',
+    'rpcUrl': 'https://api.infra.mainnet.somnia.network/',
+    'explorerUrl': 'https://explorer.somnia.network',
+  };
+
+  // Legacy configurations
+  static const Map<String, dynamic> arbitrumSepoliaConfig = {
     'chainId': '421614',
     'name': 'Arbitrum Sepolia',
     'currency': 'ETH',

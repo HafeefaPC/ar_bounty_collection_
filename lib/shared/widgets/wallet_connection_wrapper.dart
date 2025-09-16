@@ -363,7 +363,7 @@ class WalletConnectionStatus extends ConsumerWidget {
                           }
                           
                           // Attempt to switch network
-                          final success = await walletNotifier.switchToArbitrumSepolia();
+                          final success = await walletNotifier.switchToSomniaTestnet();
                           
                           // Wait for state to update
                           await Future.delayed(const Duration(seconds: 2));

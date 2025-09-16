@@ -30,7 +30,7 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
     }
 
     try {
-      debugPrint('Initializing ReownAppKit with strict Arbitrum-only configuration...');
+      debugPrint('Initializing ReownAppKit with Somnia Testnet configuration...');
       
       // Dispose existing instance if any
       if (state != null) {
@@ -43,15 +43,15 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
         state = null;
       }
 
-      // Add Arbitrum Sepolia to supported networks BEFORE creating the modal
+      // Add Somnia Testnet to supported networks BEFORE creating the modal
       ReownAppKitModalNetworks.addSupportedNetworks('eip155', [
         ReownAppKitModalNetworkInfo(
-          name: 'Arbitrum Sepolia',
-          chainId: '421614',
-          chainIcon: 'https://arbitrum.io/wp-content/uploads/2021/01/cropped-Arbitrum_Symbol-Full-color-White-background-192x192.png',
-          currency: 'ETH',
-          rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
-          explorerUrl: 'https://sepolia.arbiscan.io',
+          name: 'Somnia Testnet',
+          chainId: '50312',
+          chainIcon: 'https://somnia.network/favicon.ico',
+          currency: 'STT',
+          rpcUrl: 'https://dream-rpc.somnia.network',
+          explorerUrl: 'https://shannon-explorer.somnia.network/',
           isTestNetwork: true,
         )
       ]);
@@ -69,11 +69,11 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
             universal: 'https://ar-bounty-collection.app',
           ),
         ),
-        // STRICT: Only allow Arbitrum Sepolia in required namespaces
+        // STRICT: Only allow Somnia Testnet in required namespaces
         requiredNamespaces: {
           'eip155': RequiredNamespace(
             chains: [
-              'eip155:421614', // ONLY Arbitrum Sepolia
+              'eip155:50312', // ONLY Somnia Testnet
             ],
             methods: [
               'eth_sendTransaction',
@@ -89,11 +89,11 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
             events: ['chainChanged', 'accountsChanged'],
           ),
         },
-        // Even optional namespaces should be limited to Arbitrum family
+        // Even optional namespaces should be limited to Somnia family
         optionalNamespaces: {
           'eip155': RequiredNamespace(
             chains: [
-              'eip155:42161', // Only Arbitrum One as fallback
+              'eip155:5031', // Only Somnia Mainnet as fallback
             ],
             methods: [
               'eth_sendTransaction',
@@ -126,27 +126,27 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
       // WAIT for initialization to complete before setting default chain
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // CRITICAL: Aggressively set Arbitrum Sepolia as the default
+      // CRITICAL: Aggressively set Somnia Testnet as the default
       try {
-        debugPrint('Setting default chain to Arbitrum Sepolia...');
+        debugPrint('Setting default chain to Somnia Testnet...');
         
-        // Try to set Arbitrum Sepolia as the default chain
-        final arbitrumSepoliaNetwork = ReownAppKitModalNetworks.getNetworkById('eip155', '421614');
+        // Try to set Somnia Testnet as the default chain
+        final somniaTestnetNetwork = ReownAppKitModalNetworks.getNetworkById('eip155', '50312');
         
-        if (arbitrumSepoliaNetwork != null) {
-          await appKitModal.selectChain(arbitrumSepoliaNetwork);
-          debugPrint('Successfully set Arbitrum Sepolia as default chain');
+        if (somniaTestnetNetwork != null) {
+          await appKitModal.selectChain(somniaTestnetNetwork);
+          debugPrint('Successfully set Somnia Testnet as default chain');
           
           // Verify the chain was set correctly
           await Future.delayed(const Duration(milliseconds: 200));
           final currentChain = appKitModal.selectedChain?.chainId;
           debugPrint('Verification: Current selected chain is: $currentChain');
           
-          if (currentChain != '421614') {
+          if (currentChain != '50312') {
             debugPrint('WARNING: Default chain setting may not have worked properly');
           }
         } else {
-          debugPrint('WARNING: Arbitrum Sepolia network not found in default networks');
+          debugPrint('WARNING: Somnia Testnet network not found in default networks');
           debugPrint('The network will be added when user connects and switches');
         }
         
@@ -179,22 +179,28 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
         debugPrint('ReownAppKit session updated - Connected: ${appKitModal.isConnected}');
         debugPrint('Current chain: ${appKitModal.selectedChain?.chainId}');
         
-        // If connected but not on Arbitrum Sepolia, show warning and attempt switch
-        final listenerChainId = appKitModal.selectedChain?.chainId?.replaceAll('eip155:', '') ?? '';
-        if (appKitModal.isConnected && listenerChainId != '421614') {
-          debugPrint('Warning: Connected to chain ${appKitModal.selectedChain?.chainId} instead of Arbitrum Sepolia (421614)');
-          
-          // Attempt automatic switch after a brief delay
-          Future.delayed(const Duration(milliseconds: 2000), () async {
-            final currentChainId = appKitModal.selectedChain?.chainId?.replaceAll('eip155:', '') ?? '';
-            if (appKitModal.isConnected && currentChainId != '421614') {
-              debugPrint('Attempting automatic chain switch to Arbitrum Sepolia...');
-              final switched = await ensureArbitrumSepolia();
-              if (!switched) {
-                debugPrint('Automatic chain switch failed - user intervention required');
+        // If connected but not on Somnia Testnet, show warning and attempt switch
+        final selectedChain = appKitModal.selectedChain;
+        if (selectedChain != null) {
+          final listenerChainId = selectedChain.chainId?.replaceAll('eip155:', '') ?? '';
+          if (appKitModal.isConnected && listenerChainId != '50312') {
+            debugPrint('Warning: Connected to chain ${selectedChain.chainId} instead of Somnia Testnet (50312)');
+            
+            // Attempt automatic switch after a brief delay
+            Future.delayed(const Duration(milliseconds: 2000), () async {
+              final currentSelectedChain = appKitModal.selectedChain;
+              if (currentSelectedChain != null) {
+                final currentChainId = currentSelectedChain.chainId?.replaceAll('eip155:', '') ?? '';
+                if (appKitModal.isConnected && currentChainId != '50312') {
+                  debugPrint('Attempting automatic chain switch to Somnia Testnet...');
+                  final switched = await ensureSomniaTestnet();
+                  if (!switched) {
+                    debugPrint('Automatic chain switch failed - user intervention required');
+                  }
+                }
               }
-            }
-          });
+            });
+          }
         }
         
         // Update the state to trigger listeners
@@ -233,33 +239,35 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
     state = null;
     await initialize(context);
   }
-  // Method to switch to Arbitrum Sepolia if on wrong chain
-  Future<bool> ensureArbitrumSepolia() async {
+  // Method to switch to Somnia Testnet if on wrong chain
+  Future<bool> ensureSomniaTestnet() async {
     if (state == null || !state!.isConnected) return false;
     
-    final currentChainId = state!.selectedChain?.chainId?.replaceAll('eip155:', '') ?? '';
-    if (currentChainId != '421614') {
+    final selectedChain = state!.selectedChain;
+    if (selectedChain == null) return false;
+    final currentChainId = selectedChain.chainId?.replaceAll('eip155:', '') ?? '';
+    if (currentChainId != '50312') {
       try {
-        debugPrint('Attempting to switch to Arbitrum Sepolia...');
-        debugPrint('Current chain: ${state!.selectedChain?.chainId}');
+        debugPrint('Attempting to switch to Somnia Testnet...');
+        debugPrint('Current chain: ${selectedChain.chainId}');
         
-        // First try to find Arbitrum Sepolia in available networks
-        final arbitrumSepoliaNetwork = ReownAppKitModalNetworks.getNetworkById('eip155', '421614');
-        if (arbitrumSepoliaNetwork != null) {
-          await state!.selectChain(arbitrumSepoliaNetwork);
-          debugPrint('Switched to Arbitrum Sepolia via selectChain');
+        // First try to find Somnia Testnet in available networks
+        final somniaTestnetNetwork = ReownAppKitModalNetworks.getNetworkById('eip155', '50312');
+        if (somniaTestnetNetwork != null) {
+          await state!.selectChain(somniaTestnetNetwork);
+          debugPrint('Switched to Somnia Testnet via selectChain');
           
           // Wait for the switch to complete and verify
           await Future.delayed(const Duration(seconds: 2));
           final newChainId = state!.selectedChain?.chainId;
           debugPrint('After selectChain, current chain: $newChainId');
           
-          if (newChainId == '421614') {
+          if (newChainId == '50312') {
             return true;
           }
         } else {
           // If not found, try to request the wallet to switch via wallet_switchEthereumChain
-          debugPrint('Arbitrum Sepolia not found in networks, requesting wallet switch...');
+          debugPrint('Somnia Testnet not found in networks, requesting wallet switch...');
           
           final session = state!.session;
           if (session != null) {
@@ -274,11 +282,11 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
                 request: SessionRequestParams(
                   method: 'wallet_switchEthereumChain',
                   params: [
-                    {'chainId': '0x66eee'} // 421614 in hex
+                    {'chainId': '0xc468'} // 50312 in hex
                   ],
                 ),
               );
-              debugPrint('Requested wallet switch to Arbitrum Sepolia');
+              debugPrint('Requested wallet switch to Somnia Testnet');
               // Wait for the switch to complete
               await Future.delayed(const Duration(seconds: 3));
               
@@ -286,7 +294,7 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
               final newChainId = state!.selectedChain?.chainId;
               debugPrint('After wallet_switchEthereumChain, current chain: $newChainId');
               
-              if (newChainId == '421614') {
+              if (newChainId == '50312') {
                 return true;
               }
             } catch (switchError) {
@@ -301,20 +309,20 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
                     method: 'wallet_addEthereumChain',
                     params: [
                       {
-                        'chainId': '0x66eee', // 421614 in hex
-                        'chainName': 'Arbitrum Sepolia',
-                        'rpcUrls': ['https://sepolia-rollup.arbitrum.io/rpc'],
+                        'chainId': '0xc468', // 50312 in hex
+                        'chainName': 'Somnia Testnet',
+                        'rpcUrls': ['https://dream-rpc.somnia.network'],
                         'nativeCurrency': {
-                          'name': 'Ethereum',
-                          'symbol': 'ETH',
+                          'name': 'Somnia Test Token',
+                          'symbol': 'STT',
                           'decimals': 18,
                         },
-                        'blockExplorerUrls': ['https://sepolia.arbiscan.io'],
+                        'blockExplorerUrls': ['https://shannon-explorer.somnia.network/'],
                       }
                     ],
                   ),
                 );
-                debugPrint('Successfully added Arbitrum Sepolia network');
+                debugPrint('Successfully added Somnia Testnet network');
                 // After adding, try to switch again
                 await Future.delayed(const Duration(milliseconds: 500));
                 try {
@@ -324,18 +332,18 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
                     request: SessionRequestParams(
                       method: 'wallet_switchEthereumChain',
                       params: [
-                        {'chainId': '0x66eee'} // 421614 in hex
+                        {'chainId': '0xc468'} // 50312 in hex
                       ],
                     ),
                   );
-                  debugPrint('Successfully switched to newly added Arbitrum Sepolia');
+                  debugPrint('Successfully switched to newly added Somnia Testnet');
                   await Future.delayed(const Duration(seconds: 2));
                   
                   // Verify the switch
                   final newChainId = state!.selectedChain?.chainId;
                   debugPrint('After adding network and switching, current chain: $newChainId');
                   
-                  if (newChainId == '421614') {
+                  if (newChainId == '50312') {
                     return true;
                   }
                 } catch (secondSwitchError) {
@@ -349,11 +357,11 @@ class ReownAppKitNotifier extends StateNotifier<ReownAppKitModal?> {
           }
         }
       } catch (e) {
-        debugPrint('Error switching to Arbitrum Sepolia: $e');
+        debugPrint('Error switching to Somnia Testnet: $e');
       }
       return false;
     }
-    return true; // Already on Arbitrum Sepolia
+    return true; // Already on Somnia Testnet
   }
 }
 
@@ -425,7 +433,7 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
         if (walletAddress == null) {
           final result = await appKitModal.request(
             topic: session.topic!,
-            chainId: 'eip155:${appKitModal.selectedChain?.chainId ?? '421614'}',
+            chainId: 'eip155:${appKitModal.selectedChain?.chainId ?? '50312'}',
             request: SessionRequestParams(
               method: 'eth_accounts',
               params: [],
@@ -447,11 +455,11 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
         walletAddress = 'Connected Wallet';
       }
       
-      final chainId = appKitModal.selectedChain?.chainId ?? '421614'; // Default to Arbitrum Sepolia
-      // Warn if not on Arbitrum Sepolia (extract numeric chain ID)
+      final chainId = appKitModal.selectedChain?.chainId ?? '50312'; // Default to Somnia Testnet
+      // Warn if not on Somnia Testnet (extract numeric chain ID)
       final numericChainId = chainId.replaceAll('eip155:', '');
-      if (numericChainId != '421614') {
-        debugPrint('WARNING: Connected to chain $chainId instead of Arbitrum Sepolia (421614)');
+      if (numericChainId != '50312') {
+        debugPrint('WARNING: Connected to chain $chainId instead of Somnia Testnet (50312)');
       }
       
       final newState = WalletConnectionState(
@@ -502,7 +510,7 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
       debugPrint('Opening wallet connection modal...');
       await appKitModal.openModalView();
       
-      // After connection attempt, ensure we're on Arbitrum Sepolia
+      // After connection attempt, ensure we're on Somnia Testnet
       if (appKitModal.isConnected) {
         debugPrint('Wallet connected, now ensuring correct chain...');
         // Wait a bit for the session to stabilize
@@ -511,10 +519,10 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
         // Force refresh the connection state first
         refreshConnectionState();
         
-        // Then ensure we're on Arbitrum Sepolia
-        final switched = await _reownNotifier.ensureArbitrumSepolia();
-        if (!switched && appKitModal.selectedChain?.chainId != '421614') {
-          debugPrint('Failed to automatically switch to Arbitrum Sepolia. User will need to switch manually.');
+        // Then ensure we're on Somnia Testnet
+        final switched = await _reownNotifier.ensureSomniaTestnet();
+        if (!switched && appKitModal.selectedChain?.chainId != '50312') {
+          debugPrint('Failed to automatically switch to Somnia Testnet. User will need to switch manually.');
         }
       }
     } catch (e) {
@@ -542,11 +550,11 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
       throw Exception('Wallet not connected');
     }
 
-    // Ensure we're on Arbitrum Sepolia before sending transaction
-    if (state.chainId != '421614') {
-      final switched = await _reownNotifier.ensureArbitrumSepolia();
+    // Ensure we're on Somnia Testnet before sending transaction
+    if (state.chainId != '50312') {
+      final switched = await _reownNotifier.ensureSomniaTestnet();
       if (!switched) {
-        throw Exception('Please switch to Arbitrum Sepolia network');
+        throw Exception('Please switch to Somnia Testnet network');
       }
     }
 
@@ -571,7 +579,7 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
   bool isWalletReady() {
     return state.isConnected && 
            state.sessionTopic != null && 
-           state.chainId == '421614' && // Must be on Arbitrum Sepolia
+           state.chainId == '50312' && // Must be on Somnia Testnet
            _reownNotifier.state != null;
   }
 
@@ -611,15 +619,15 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
       Future(() => _updateConnectionState());
       
       // Ensure we're on the correct chain
-      await _reownNotifier.ensureArbitrumSepolia();
+      await _reownNotifier.ensureSomniaTestnet();
     } else {
       debugPrint('No existing wallet session found');
     }
   }
 
-  // Method to force switch to Arbitrum Sepolia
-  Future<bool> switchToArbitrumSepolia() async {
-    debugPrint('WalletConnectionNotifier: Attempting to switch to Arbitrum Sepolia...');
+  // Method to force switch to Somnia Testnet
+  Future<bool> switchToSomniaTestnet() async {
+    debugPrint('WalletConnectionNotifier: Attempting to switch to Somnia Testnet...');
     
     try {
       // First, refresh the connection state to get the latest information
@@ -629,10 +637,10 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
       await Future.delayed(const Duration(milliseconds: 500));
       
       // Attempt to switch using the ReownAppKit notifier
-      final success = await _reownNotifier.ensureArbitrumSepolia();
+      final success = await _reownNotifier.ensureSomniaTestnet();
       
       if (success) {
-        debugPrint('WalletConnectionNotifier: Successfully switched to Arbitrum Sepolia');
+        debugPrint('WalletConnectionNotifier: Successfully switched to Somnia Testnet');
         
         // Wait for the switch to complete
         await Future.delayed(const Duration(seconds: 2));
@@ -645,19 +653,19 @@ class WalletConnectionNotifier extends StateNotifier<WalletConnectionState> {
         
         // Verify the switch was successful
         final currentState = state;
-        if (currentState.chainId == '421614') {
-          debugPrint('WalletConnectionNotifier: Verified switch to Arbitrum Sepolia (Chain ID: ${currentState.chainId})');
+        if (currentState.chainId == '50312') {
+          debugPrint('WalletConnectionNotifier: Verified switch to Somnia Testnet (Chain ID: ${currentState.chainId})');
           return true;
         } else {
           debugPrint('WalletConnectionNotifier: Switch verification failed. Current chain: ${currentState.chainId}');
           return false;
         }
       } else {
-        debugPrint('WalletConnectionNotifier: Failed to switch to Arbitrum Sepolia');
+        debugPrint('WalletConnectionNotifier: Failed to switch to Somnia Testnet');
         return false;
       }
     } catch (e) {
-      debugPrint('WalletConnectionNotifier: Error switching to Arbitrum Sepolia: $e');
+      debugPrint('WalletConnectionNotifier: Error switching to Somnia Testnet: $e');
       return false;
     }
   }

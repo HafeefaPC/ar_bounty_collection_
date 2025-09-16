@@ -822,7 +822,7 @@ class _WalletConnectionScreenState extends ConsumerState<WalletConnectionScreen>
       debugPrint('Attempting to switch to Arbitrum Sepolia...');
       
       // Try to switch using the wallet connection provider
-      final success = await ref.read(walletConnectionProvider.notifier).switchToArbitrumSepolia();
+      final success = await ref.read(walletConnectionProvider.notifier).switchToSomniaTestnet();
       
       if (success) {
         _showSuccess('Successfully switched to Arbitrum Sepolia!');

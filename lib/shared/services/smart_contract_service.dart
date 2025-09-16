@@ -5,14 +5,14 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 class SmartContractService {
-  // Contract addresses on Arbitrum Sepolia Testnet (UPDATED - Latest Deployment)
-  static const String eventFactoryAddress = "0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d";
-  static const String boundaryNFTAddress = "0xC585B8e492210FbEDbFE8BB353366DC968c9F77A";
-  static const String claimVerificationAddress = "0xed4468D5f1247dfD6BD19Dd54BD91278B647d6Aa";
+  // Contract addresses on Somnia Testnet (DEPLOYED ✅)
+  static const String eventFactoryAddress = "0xf9CF13b978A71113992De2A0373fE76d3B64B6dc";
+  static const String boundaryNFTAddress = "0xbac9dBf16337cAC4b8aBAef3941615e57dB37073";
+  static const String claimVerificationAddress = "0xB6Ba7b7501D5F6D71213B0f75f7b8a9eFc3e8507";
   
   // Network configuration
-  static const String rpcUrl = "https://sepolia-rollup.arbitrum.io/rpc";
-  static const int chainId = 421614; // Arbitrum Sepolia Testnet
+  static const String rpcUrl = "https://dream-rpc.somnia.network";
+  static const int chainId = 50312; // Somnia Testnet
   
   ReownAppKitModal? _appKitModal;
   

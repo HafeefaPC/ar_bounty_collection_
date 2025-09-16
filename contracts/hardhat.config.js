@@ -1,6 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "3009eef2ac66c793320e1ee0cecdd2aec069aceb0f161b0b13e88857b9a7cbf7";
+const SOMNIA_TESTNET_RPC_URL = process.env.SOMNIA_TESTNET_RPC_URL || "https://dream-rpc.somnia.network";
+const SOMNIA_MAINNET_RPC_URL = process.env.SOMNIA_MAINNET_RPC_URL || "https://api.infra.mainnet.somnia.network/";
 const ARBITRUM_SEPOLIA_RPC_URL = process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc";
 const ARBISCAN_API_KEY = process.env.ARBISCAN_API_KEY || "";
 const AVALANCHE_RPC_URL = process.env.AVALANCHE_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
@@ -21,6 +23,22 @@ module.exports = {
   networks: {
     localhost: {
       url: "http://127.0.0.1:8545"
+    },
+    somniaTestnet: {
+      url: SOMNIA_TESTNET_RPC_URL,
+      chainId: 50312,
+      accounts: [PRIVATE_KEY],
+      gas: 3000000, // Reduced gas limit
+      // Use EIP-1559 gas pricing for Somnia Testnet
+      maxFeePerGas: 15000000000, // 15 gwei max fee
+      maxPriorityFeePerGas: 2000000000, // 2 gwei priority fee
+    },
+    somniaMainnet: {
+      url: SOMNIA_MAINNET_RPC_URL,
+      chainId: 5031,
+      accounts: [PRIVATE_KEY],
+      gas: 8000000,
+      gasPrice: 2000000000, // 2 gwei for Somnia Mainnet
     },
     arbitrumSepolia: {
       url: ARBITRUM_SEPOLIA_RPC_URL,

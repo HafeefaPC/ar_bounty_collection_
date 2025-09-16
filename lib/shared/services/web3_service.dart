@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 
 class Web3Service {
-  static const String _arbitrumSepoliaRpcUrl = 'https://sepolia-rollup.arbitrum.io/rpc';
-  static const int _chainId = 421614;
+  static const String _somniaTestnetRpcUrl = 'https://dream-rpc.somnia.network';
+  static const int _chainId = 50312;
   
   late Web3Client _client;
   late EthereumAddress _eventFactoryAddress;
@@ -18,17 +18,17 @@ class Web3Service {
   late DeployedContract _claimVerificationContract;
   
   Web3Service() {
-    _client = Web3Client(_arbitrumSepoliaRpcUrl, http.Client());
+    _client = Web3Client(_somniaTestnetRpcUrl, http.Client());
     _loadContractAddresses();
   }
   
   void _loadContractAddresses() {
-    // Load contract addresses from the new deployment (NO ROLE RESTRICTIONS)
-    _eventFactoryAddress = EthereumAddress.fromHex('0x465865E0bFA28d7794fC103b57fd089656872907');
-    _boundaryNFTAddress = EthereumAddress.fromHex('0xDF4FD714E5077eb28F0AeFe654b7d08dc9eBe617');
-    _claimVerificationAddress = EthereumAddress.fromHex('0x8C6cb26c18D79D158502D117e9F3d2fD04a28790');
+    // Load contract addresses from Somnia Testnet deployment
+    _eventFactoryAddress = EthereumAddress.fromHex('0xf9CF13b978A71113992De2A0373fE76d3B64B6dc');
+    _boundaryNFTAddress = EthereumAddress.fromHex('0xbac9dBf16337cAC4b8aBAef3941615e57dB37073');
+    _claimVerificationAddress = EthereumAddress.fromHex('0xB6Ba7b7501D5F6D71213B0f75f7b8a9eFc3e8507');
     
-    print('✅ Web3Service: Loaded NEW contract addresses (no role restrictions):');
+    print('✅ Web3Service: Loaded Somnia Testnet contract addresses:');
     print('  - EventFactory: ${_eventFactoryAddress.hex}');
     print('  - BoundaryNFT: ${_boundaryNFTAddress.hex}');
     print('  - ClaimVerification: ${_claimVerificationAddress.hex}');
@@ -71,7 +71,7 @@ class Web3Service {
   int get chainId => _chainId;
   
   // Get the RPC URL
-  String get rpcUrl => _arbitrumSepoliaRpcUrl;
+  String get rpcUrl => _somniaTestnetRpcUrl;
   
   // Get contract addresses
   EthereumAddress get eventFactoryAddress => _eventFactoryAddress;
@@ -188,7 +188,7 @@ class Web3Service {
       
       print('✅ Web3Service: Event creation transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -635,7 +635,7 @@ class Web3Service {
       
       print('✅ Web3Service: NFT claiming transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -733,7 +733,7 @@ class Web3Service {
       
       print('✅ Web3Service: NFT minting transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {
@@ -824,7 +824,7 @@ class Web3Service {
       
       print('✅ Web3Service: Location claim transaction sent successfully');
       print('📝 Transaction Hash: $txHash');
-      print('🔗 View on explorer: https://sepolia.arbiscan.io/tx/$txHash');
+      print('🔗 View on explorer: https://shannon-explorer.somnia.network/tx/$txHash');
       
       return txHash;
     } catch (e) {

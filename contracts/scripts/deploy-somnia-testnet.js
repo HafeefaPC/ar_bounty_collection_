@@ -15,9 +15,9 @@ async function main() {
   
   // Check balance
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("💰 Account balance:", ethers.formatEther(balance), "STT");
+  console.log("💰 Account balance:", ethers.utils.formatEther(balance), "STT");
   
-  if (balance < ethers.parseEther("0.1")) {
+  if (balance.lt(ethers.utils.parseEther("0.1"))) {
     console.log("⚠️  WARNING: Low balance! You may need more STT for gas fees.");
     console.log("💧 Get testnet STT from: https://testnet.somnia.network/");
   }
@@ -25,61 +25,65 @@ async function main() {
   const deploymentResults = {};
 
   try {
-    console.log("⛽ Using EIP-1559 gas pricing from Hardhat config");
-    
     // 1. Deploy EventFactory
     console.log("\n📦 Deploying EventFactory contract...");
     const EventFactory = await ethers.getContractFactory("EventFactory");
     const eventFactory = await EventFactory.deploy();
-    await eventFactory.waitForDeployment();
+    await eventFactory.deployed();
     
-    const eventFactoryAddress = await eventFactory.getAddress();
-    console.log("✅ EventFactory deployed to:", eventFactoryAddress);
-    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + eventFactoryAddress);
+    console.log("✅ EventFactory deployed to:", eventFactory.address);
+    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + eventFactory.address);
     
     deploymentResults.EventFactory = {
-      address: eventFactoryAddress,
-      transactionHash: eventFactory.deploymentTransaction().hash,
-      blockNumber: eventFactory.deploymentTransaction().blockNumber
+      address: eventFactory.address,
+      transactionHash: eventFactory.deployTransaction.hash,
+      blockNumber: eventFactory.deployTransaction.blockNumber
     };
 
     // 2. Deploy BoundaryNFT
     console.log("\n📦 Deploying BoundaryNFT contract...");
     const BoundaryNFT = await ethers.getContractFactory("BoundaryNFT");
-    const boundaryNFT = await BoundaryNFT.deploy(eventFactoryAddress);
-    await boundaryNFT.waitForDeployment();
+    const boundaryNFT = await BoundaryNFT.deploy();
+    await boundaryNFT.deployed();
     
-    const boundaryNFTAddress = await boundaryNFT.getAddress();
-    console.log("✅ BoundaryNFT deployed to:", boundaryNFTAddress);
-    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + boundaryNFTAddress);
+    console.log("✅ BoundaryNFT deployed to:", boundaryNFT.address);
+    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + boundaryNFT.address);
     
     deploymentResults.BoundaryNFT = {
-      address: boundaryNFTAddress,
-      transactionHash: boundaryNFT.deploymentTransaction().hash,
-      blockNumber: boundaryNFT.deploymentTransaction().blockNumber
+      address: boundaryNFT.address,
+      transactionHash: boundaryNFT.deployTransaction.hash,
+      blockNumber: boundaryNFT.deployTransaction.blockNumber
     };
 
     // 3. Deploy ClaimVerification
     console.log("\n📦 Deploying ClaimVerification contract...");
     const ClaimVerification = await ethers.getContractFactory("ClaimVerification");
     const claimVerification = await ClaimVerification.deploy();
-    await claimVerification.waitForDeployment();
+    await claimVerification.deployed();
     
-    const claimVerificationAddress = await claimVerification.getAddress();
-    console.log("✅ ClaimVerification deployed to:", claimVerificationAddress);
-    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + claimVerificationAddress);
+    console.log("✅ ClaimVerification deployed to:", claimVerification.address);
+    console.log("🔗 View on explorer: https://shannon-explorer.somnia.network/address/" + claimVerification.address);
     
     deploymentResults.ClaimVerification = {
-      address: claimVerificationAddress,
-      transactionHash: claimVerification.deploymentTransaction().hash,
-      blockNumber: claimVerification.deploymentTransaction().blockNumber
+      address: claimVerification.address,
+      transactionHash: claimVerification.deployTransaction.hash,
+      blockNumber: claimVerification.deployTransaction.blockNumber
     };
 
-    // 4. Contract relationships
-    console.log("\n🔗 Contract relationships:");
-    console.log("  - EventFactory: Standalone contract for event management");
-    console.log("  - BoundaryNFT: Connected to EventFactory via constructor");
-    console.log("  - ClaimVerification: Standalone contract for claim verification");
+    // 4. Set up contract relationships
+    console.log("\n🔗 Setting up contract relationships...");
+    
+    // Set BoundaryNFT address in EventFactory
+    console.log("  - Setting BoundaryNFT address in EventFactory...");
+    const setBoundaryNFTTx = await eventFactory.setBoundaryNFT(boundaryNFT.address);
+    await setBoundaryNFTTx.wait();
+    console.log("  ✅ BoundaryNFT address set in EventFactory");
+    
+    // Set ClaimVerification address in EventFactory
+    console.log("  - Setting ClaimVerification address in EventFactory...");
+    const setClaimVerificationTx = await eventFactory.setClaimVerification(claimVerification.address);
+    await setClaimVerificationTx.wait();
+    console.log("  ✅ ClaimVerification address set in EventFactory");
 
     // 5. Save deployment results
     const fs = require('fs');
@@ -107,21 +111,21 @@ async function main() {
     console.log("⏰ Time:", new Date().toISOString());
     console.log("");
     console.log("📦 CONTRACT ADDRESSES:");
-    console.log("  EventFactory:     " + eventFactoryAddress);
-    console.log("  BoundaryNFT:      " + boundaryNFTAddress);
-    console.log("  ClaimVerification: " + claimVerificationAddress);
+    console.log("  EventFactory:     " + eventFactory.address);
+    console.log("  BoundaryNFT:      " + boundaryNFT.address);
+    console.log("  ClaimVerification: " + claimVerification.address);
     console.log("");
     console.log("🔗 EXPLORER LINKS:");
-    console.log("  EventFactory:     https://shannon-explorer.somnia.network/address/" + eventFactoryAddress);
-    console.log("  BoundaryNFT:      https://shannon-explorer.somnia.network/address/" + boundaryNFTAddress);
-    console.log("  ClaimVerification: https://shannon-explorer.somnia.network/address/" + claimVerificationAddress);
+    console.log("  EventFactory:     https://shannon-explorer.somnia.network/address/" + eventFactory.address);
+    console.log("  BoundaryNFT:      https://shannon-explorer.somnia.network/address/" + boundaryNFT.address);
+    console.log("  ClaimVerification: https://shannon-explorer.somnia.network/address/" + claimVerification.address);
     console.log("");
     console.log("💡 NEXT STEPS:");
     console.log("  1. Update your Flutter app configuration with these addresses");
     console.log("  2. Test contract interactions on Somnia Testnet");
     console.log("  3. Get STT from faucet if needed: https://testnet.somnia.network/");
     console.log("=" .repeat(50));
-    
+
   } catch (error) {
     console.error("❌ Deployment failed:", error);
     console.error("🔍 Error details:", error.message);
@@ -144,3 +148,8 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+
+
+
+

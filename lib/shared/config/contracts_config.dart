@@ -1,5 +1,19 @@
 class ContractsConfig {
-  // Contract addresses for Arbitrum Sepolia testnet (UPDATED - Latest Deployment)
+  // Contract addresses for Somnia Testnet (DEPLOYED ✅)
+  static const Map<String, String> somniaTestnetContracts = {
+    'EventFactory': '0xf9CF13b978A71113992De2A0373fE76d3B64B6dc',
+    'BoundaryNFT': '0xbac9dBf16337cAC4b8aBAef3941615e57dB37073',
+    'ClaimVerification': '0xB6Ba7b7501D5F6D71213B0f75f7b8a9eFc3e8507',
+  };
+
+  // Contract addresses for Somnia Mainnet (for future use)
+  static const Map<String, String> somniaMainnetContracts = {
+    'EventFactory': '0x0000000000000000000000000000000000000000',
+    'BoundaryNFT': '0x0000000000000000000000000000000000000000',
+    'ClaimVerification': '0x0000000000000000000000000000000000000000',
+  };
+
+  // Contract addresses for Arbitrum Sepolia testnet (legacy)
   static const Map<String, String> arbitrumSepoliaContracts = {
     'EventFactory': '0xF1f37ee2187da8807AFeF6bc31526bFfA6f43f1d',
     'BoundaryNFT': '0xC585B8e492210FbEDbFE8BB353366DC968c9F77A',
@@ -22,6 +36,22 @@ class ContractsConfig {
 
   // Network configurations
   static const Map<String, Map<String, dynamic>> networkConfigs = {
+    'somniaTestnet': {
+      'name': 'Somnia Testnet',
+      'chainId': 50312,
+      'rpcUrl': 'https://dream-rpc.somnia.network',
+      'nativeCurrency': 'STT',
+      'blockExplorer': 'https://shannon-explorer.somnia.network/',
+      'contracts': somniaTestnetContracts,
+    },
+    'somniaMainnet': {
+      'name': 'Somnia Mainnet',
+      'chainId': 5031,
+      'rpcUrl': 'https://api.infra.mainnet.somnia.network/',
+      'nativeCurrency': 'SOMI',
+      'blockExplorer': 'https://explorer.somnia.network',
+      'contracts': somniaMainnetContracts,
+    },
     'arbitrumSepolia': {
       'name': 'Arbitrum Sepolia Testnet',
       'chainId': 421614,
@@ -49,7 +79,7 @@ class ContractsConfig {
   };
 
   // Default network
-  static const String defaultNetwork = 'arbitrumSepolia';
+  static const String defaultNetwork = 'somniaTestnet';
 
   // Get contract addresses for a specific network
   static Map<String, String> getContracts(String network) {
