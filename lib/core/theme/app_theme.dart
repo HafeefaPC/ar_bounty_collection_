@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Modern Color Palette inspired by Sinport design
-  static const Color primaryColor = Color(0xFF6366F1); // Modern Indigo
-  static const Color secondaryColor = Color(0xFF8B5CF6); // Modern Purple
-  static const Color accentColor = Color(0xFF06B6D4); // Modern Cyan
-  static const Color backgroundColor = Color(0xFF0F0F23); // Deep Dark Blue
-  static const Color surfaceColor = Color(0xFF1E1E3F); // Dark Surface
-  static const Color cardColor = Color(0xFF2A2A4A); // Card Background
-  static const Color textColor = Color(0xFFFFFFFF); // White Text
-  static const Color textSecondary = Color(0xFF94A3B8); // Secondary Text
-  static const Color successColor = Color(0xFF10B981); // Modern Green
-  static const Color errorColor = Color(0xFFEF4444); // Modern Red
-  static const Color warningColor = Color(0xFFF59E0B); // Modern Amber
-  static const Color infoColor = Color(0xFF3B82F6); // Modern Blue
-  static const Color borderColor = Color(0xFF374151); // Border Color
+  // Cartoon-Related Children-Friendly Color Palette
+  static const Color primaryColor = Color(0xFFFFECB3); // Light Yellow (like yellow-200)
+  static const Color secondaryColor = Color(0xFFFDD835); // Sunny Yellow
+  static const Color accentColor = Color(0xFF4FC3F7); // Sky Blue
+  static const Color backgroundColor = Color(0xFFE0F2F7); // Very Light Blue/Pale Cyan
+  static const Color surfaceColor = Color(0xFFFFFDE7); // Creamy White
+  static const Color cardColor = Color(0xFFFFECB3); // Light Yellow (matching primary)
+  static const Color textColor = Color(0xFF424242); // Dark Grey (for readability on light backgrounds)
+  static const Color textSecondary = Color(0xFF757575); // Medium Grey
+  static const Color successColor = Color(0xFF81C784); // Happy Green
+  static const Color errorColor = Color(0xFFEF5350); // Friendly Red
+  static const Color warningColor = Color(0xFFFFCA28); // Bright Orange
+  static const Color infoColor = Color(0xFF64B5F6); // Soft Blue
+  static const Color borderColor = Color(0xFFBBDEFB); // Light Blue Border
 
-  // Modern Gradients inspired by Sinport
+  // Cartoon-Friendly Gradients
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF6366F1),
-      Color(0xFF8B5CF6),
-      Color(0xFF06B6D4),
+       Color.fromARGB(255, 122, 185, 203), // Very Light Blue
+      Color.fromARGB(255, 122, 185, 203),  // Light Blue
+      Color.fromARGB(255, 122, 185, 203),  // Very Light Blue
     ],
     stops: [0.0, 0.5, 1.0],
   );
@@ -32,9 +32,9 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF8B5CF6),
-      Color(0xFF06B6D4),
-      Color(0xFF10B981),
+      Color(0xFF81C784), // Happy Green
+      Color(0xFF64B5F6), // Soft Blue
+      Color(0xFFFFA000), // Deeper Orange
     ],
     stops: [0.0, 0.5, 1.0],
   );
@@ -43,8 +43,8 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF2A2A4A),
-      Color(0xFF1E1E3F),
+      Color(0xFFFFECB3), // Light Yellow
+      Color(0xFFFFF9C4), // Very Light Yellow
     ],
     stops: [0.0, 1.0],
   );
@@ -53,19 +53,22 @@ class AppTheme {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF0F0F23),
-      Color(0xFF1E1E3F),
-      Color(0xFF0F0F23),
+       Color(0xFFFFECB3), // Very Light Blue
+      Color(0xFFFFECB3), // Light Blue
+      Color(0xFFFFECB3), // Very Light Blue
+    
     ],
     stops: [0.0, 0.5, 1.0],
   );
 
-  // Modern Text Styles inspired by Sinport
+  // Cartoon-Friendly Text Styles (adjusted for readability on lighter backgrounds)
+  // Using a more playful font if you have one, or a clean sans-serif.
+  // I'll keep SF Pro Display/Text for now, but adjust colors.
   static const TextStyle modernTitle = TextStyle(
     fontFamily: 'SF Pro Display',
     fontSize: 32,
     fontWeight: FontWeight.w700,
-    color: textColor,
+    color: Color.fromARGB(255, 96, 164, 113), // Darker text for readability
     letterSpacing: -0.5,
     height: 1.2,
   );
@@ -92,7 +95,7 @@ class AppTheme {
     fontFamily: 'SF Pro Text',
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    color: textSecondary,
+    color: textSecondary, // Medium grey for secondary text
     letterSpacing: -0.1,
     height: 1.4,
   );
@@ -101,7 +104,7 @@ class AppTheme {
     fontFamily: 'SF Pro Display',
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    color: textColor,
+    color: textColor, // Darker text for buttons
     letterSpacing: -0.2,
     height: 1.2,
   );
@@ -115,7 +118,7 @@ class AppTheme {
     height: 1.3,
   );
 
-  // Additional text styles for compatibility
+  // Additional text styles for compatibility (colors adjusted)
   static const TextStyle modernHeadlineSmall = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w600,
@@ -156,33 +159,33 @@ class AppTheme {
     letterSpacing: 0.1,
   );
 
-  // Modern Button Styles inspired by Sinport
+  // Cartoon-Friendly Button Styles
   static ButtonStyle modernPrimaryButton = ElevatedButton.styleFrom(
-    backgroundColor: primaryColor,
-    foregroundColor: textColor,
+    backgroundColor: const Color.fromARGB(255, 122, 185, 203), // Sunny Yellow
+    foregroundColor: textColor, // Dark text
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
     ),
-    elevation: 0,
-    shadowColor: Colors.transparent,
+    elevation: 4, // Add a bit of friendly elevation
+    shadowColor: secondaryColor.withOpacity(0.4),
   );
 
   static ButtonStyle modernSecondaryButton = ElevatedButton.styleFrom(
-    backgroundColor: cardColor,
+    backgroundColor: surfaceColor, // Creamy White
     foregroundColor: textColor,
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: primaryColor, width: 1),
+      side: const BorderSide(color: accentColor, width: 2), // Sky Blue border
     ),
-    elevation: 0,
-    shadowColor: Colors.transparent,
+    elevation: 2,
+    shadowColor: Colors.black.withOpacity(0.1),
   );
 
   static ButtonStyle modernOutlinedButton = OutlinedButton.styleFrom(
-    foregroundColor: textColor,
-    side: const BorderSide(color: primaryColor, width: 1),
+    foregroundColor: accentColor, // Sky Blue text
+    side: const BorderSide(color: accentColor, width: 2),
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
@@ -190,14 +193,14 @@ class AppTheme {
   );
 
   static ButtonStyle modernTextButton = TextButton.styleFrom(
-    foregroundColor: primaryColor,
+    foregroundColor: accentColor, // Sky Blue
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
     ),
   );
 
-  // Modern Input Decoration inspired by Sinport
+  // Cartoon-Friendly Input Decoration
   static InputDecoration modernInputDecoration({
     required String labelText,
     String? hintText,
@@ -211,68 +214,68 @@ class AppTheme {
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.transparent),
+        borderSide: const BorderSide(color: borderColor), // Light blue border
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.transparent),
+        borderSide: const BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: primaryColor, width: 2),
+        borderSide: const BorderSide(color: accentColor, width: 2), // Sky Blue focus
       ),
       filled: true,
-      fillColor: cardColor,
+      fillColor: surfaceColor, // Creamy white fill
       labelStyle: const TextStyle(color: textSecondary, fontFamily: 'SF Pro Text'),
       hintStyle: const TextStyle(color: textSecondary, fontFamily: 'SF Pro Text'),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 
-  // Modern Card Decoration inspired by Sinport
+  // Cartoon-Friendly Card Decoration
   static BoxDecoration modernCardDecoration = BoxDecoration(
-    gradient: cardGradient,
+    gradient: cardGradient, // Light yellow gradient
     borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+    border: Border.all(color: borderColor, width: 1), // Light blue border
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.black.withOpacity(0.1), // Softer shadow
         offset: const Offset(0, 8),
-        blurRadius: 24,
+        blurRadius: 16,
         spreadRadius: 0,
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(0.1),
+        color: Colors.black.withOpacity(0.05),
         offset: const Offset(0, 2),
+        blurRadius: 4,
+        spreadRadius: 0,
+      ),
+    ],
+  );
+
+  // Cartoon-Friendly Container Decoration
+  static BoxDecoration modernContainerDecoration = BoxDecoration(
+    color: cardColor, // Light yellow color
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: borderColor, width: 1), // Light blue border
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.1), // Softer shadow
+        offset: const Offset(0, 4),
         blurRadius: 8,
         spreadRadius: 0,
       ),
     ],
   );
 
-  // Modern Container Decoration
-  static BoxDecoration modernContainerDecoration = BoxDecoration(
-    color: cardColor,
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.2),
-        offset: const Offset(0, 4),
-        blurRadius: 12,
-        spreadRadius: 0,
-      ),
-    ],
-  );
-
-  // Modern Progress Indicator Style
+  // Modern Progress Indicator Style (color changed)
   static const double modernProgressHeight = 4.0;
 
-  // Modern App Bar Theme
+  // Modern App Bar Theme (colors adjusted)
   static const AppBarTheme modernAppBarTheme = AppBarTheme(
-    backgroundColor: Colors.transparent,
+    backgroundColor: primaryColor, // Use a solid color for app bar if desired
     foregroundColor: textColor,
-    elevation: 0,
+    elevation: 2, // A little elevation for depth
     centerTitle: true,
     titleTextStyle: TextStyle(
       fontFamily: 'SF Pro Display',
@@ -283,34 +286,34 @@ class AppTheme {
     ),
   );
 
-  // Modern Scaffold Background
+  // Modern Scaffold Background (now a gradient of light blues)
   static const BoxDecoration modernScaffoldBackground = BoxDecoration(
     gradient: backgroundGradient,
   );
 
-  // Modern Glow Effect
+  // Modern Glow Effect (colors adjusted for brighter glow)
   static List<BoxShadow> modernGlow(Color color) => [
     BoxShadow(
-      color: color.withOpacity(0.3),
+      color: color.withOpacity(0.4), // Brighter glow
       offset: const Offset(0, 0),
       blurRadius: 20,
       spreadRadius: 0,
     ),
     BoxShadow(
-      color: color.withOpacity(0.1),
+      color: color.withOpacity(0.2),
       offset: const Offset(0, 0),
       blurRadius: 40,
       spreadRadius: 0,
     ),
   ];
 
-  // Modern Border
+  // Modern Border (color changed)
   static BoxDecoration modernBorder(Color color) => BoxDecoration(
-    border: Border.all(color: color, width: 1),
+    border: Border.all(color: color, width: 2), // Slightly thicker border
     borderRadius: BorderRadius.circular(16),
   );
 
-  // Modern Animated Container
+  // Modern Animated Container (colors adjusted)
   static BoxDecoration modernAnimatedContainer({
     required Color color,
     bool isGlowing = false,
@@ -318,28 +321,28 @@ class AppTheme {
     return BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+      border: Border.all(color: borderColor, width: 1), // Light blue border
       boxShadow: isGlowing ? modernGlow(color) : [
         BoxShadow(
-          color: Colors.black.withOpacity(0.2),
+          color: Colors.black.withOpacity(0.1), // Softer shadow
           offset: const Offset(0, 4),
-          blurRadius: 12,
+          blurRadius: 8,
           spreadRadius: 0,
         ),
       ],
     );
   }
 
-  // Modern Glass Effect
+  // Modern Glass Effect (adjusted for brighter, cartoon look)
   static BoxDecoration modernGlassEffect = BoxDecoration(
-    color: Colors.white.withOpacity(0.1),
+    color: Colors.white.withOpacity(0.4), // More opaque for a visible "glass"
     borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+    border: Border.all(color: Colors.white.withOpacity(0.6), width: 1), // More visible border
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.1),
+        color: Colors.blue.shade100.withOpacity(0.5), // Lighter, playful shadow
         offset: const Offset(0, 8),
-        blurRadius: 32,
+        blurRadius: 24,
         spreadRadius: 0,
       ),
     ],

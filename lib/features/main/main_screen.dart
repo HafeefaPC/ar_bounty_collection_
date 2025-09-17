@@ -47,11 +47,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ),
                       ),
                       const Spacer(),
-                      // Wallet connection status
-                      WalletConnectionStatus(
-                        showAddress: true,
-                        showDisconnectButton: false,
-                      ),
+                     
+                    
                     ],
                   ),
                 ),

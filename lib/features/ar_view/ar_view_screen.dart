@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
+import 'package:face_reflector/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
@@ -537,14 +538,14 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: RetroTheme.primaryGreen,
-            border: Border.all(color: RetroTheme.brightGreen, width: 3),
+            color: AppTheme.primaryColor,
+            border: Border.all(color: Color.fromARGB(255, 122, 185, 203),width: 3),
           ),
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: RetroTheme.darkGreen,
-              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+              color: AppTheme.primaryColor,
+              border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -553,14 +554,14 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   decoration: BoxDecoration(
-                    color: RetroTheme.brightGreen,
-                    border: Border.all(color: RetroTheme.lightGreen, width: 2),
+                    color: AppTheme.textColor,
+                    border: Border.all(color: AppTheme.textColor, width: 2),
                   ),
                   child: Text(
                     '>>> CLAIM SUCCESSFUL <<<',
                     style: TextStyle(
                       fontFamily: 'Courier',
-                      color: RetroTheme.darkGreen,
+                      color: AppTheme.primaryColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -573,8 +574,8 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    border: Border.all(color: RetroTheme.brightGreen, width: 3),
-                    color: RetroTheme.primaryGreen,
+                    border: Border.all(color: AppTheme.textColor, width: 3),
+                    color: Color.fromARGB(255, 122, 185, 203),
                   ),
                   child: _buildImageWithRetry(boundary.imageUrl),
                 ),
@@ -585,7 +586,7 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
                   boundary.name.toUpperCase(),
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -597,7 +598,7 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
                   boundary.description.toUpperCase(),
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.lightGreen,
+                    color: AppTheme.textColor,
                     fontSize: 12,
                   ),
                   textAlign: TextAlign.center,
@@ -610,14 +611,14 @@ class _RetroARViewScreenState extends ConsumerState<RetroARViewScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
                     decoration: BoxDecoration(
-                      color: RetroTheme.primaryGreen,
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      color: Color.fromARGB(255, 122, 185, 203),
+                      border: Border.all(color: AppTheme.textColor, width: 2),
                     ),
                     child: Text(
                       '[ CONTINUE ]',
                       style: TextStyle(
                         fontFamily: 'Courier',
-                        color: RetroTheme.brightGreen,
+                        color: AppTheme.textColor,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -664,7 +665,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
         
         // Show loading progress
         return Container(
-          color: RetroTheme.primaryGreen,
+          color: Color.fromARGB(255, 122, 185, 203),
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -673,14 +674,14 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                    border: Border.all(color: AppTheme.textColor, width: 1),
                   ),
                   child: CircularProgressIndicator(
                     value: loadingProgress.expectedTotalBytes != null
                         ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
                         : null,
-                    valueColor: AlwaysStoppedAnimation<Color>(RetroTheme.brightGreen),
-                    backgroundColor: RetroTheme.primaryGreen,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textColor),
+                    backgroundColor: Color.fromARGB(255, 122, 185, 203),
                     strokeWidth: 2,
                   ),
                 ),
@@ -689,7 +690,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
                   'LOADING',
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
@@ -709,14 +710,14 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
         
         // Show detailed error info
         return Container(
-          color: RetroTheme.primaryGreen,
+          color: Color.fromARGB(255, 122, 185, 203),
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.error_outline,
-                  color: RetroTheme.brightGreen,
+                  color: AppTheme.textColor,
                   size: 20,
                 ),
                 const SizedBox(height: 4),
@@ -724,7 +725,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
                   'LOAD ERROR',
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
@@ -736,7 +737,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
                       : error.toString(),
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     fontSize: 6,
                   ),
                   textAlign: TextAlign.center,
@@ -763,7 +764,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
 
   Widget _buildDefaultPixelatedNFT() {
     return Container(
-      color: RetroTheme.primaryGreen,
+      color: Color.fromARGB(255, 122, 185, 203),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -772,14 +773,14 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: RetroTheme.brightGreen,
-                border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                color: AppTheme.textColor,
+                border: Border.all(color: AppTheme.textColor, width: 1),
               ),
               child: Center(
                 child: Container(
                   width: 16,
                   height: 16,
-                  color: RetroTheme.lightGreen,
+                  color: AppTheme.textColor,
                 ),
               ),
             ),
@@ -788,7 +789,7 @@ Widget _buildPixelatedNFTImage(String imageUrl) {
               'NFT',
               style: TextStyle(
                 fontFamily: 'Courier',
-                color: RetroTheme.brightGreen,
+                color: AppTheme.textColor,
                 fontSize: 8,
                 fontWeight: FontWeight.bold,
               ),
@@ -882,29 +883,29 @@ void _showAllImagesTest() {
         height: MediaQuery.of(context).size.height * 0.8,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: RetroTheme.primaryGreen,
-          border: Border.all(color: RetroTheme.brightGreen, width: 3),
+          color: Color.fromARGB(255, 122, 185, 203),
+          border: Border.all(color: AppTheme.textColor, width: 3),
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: RetroTheme.darkGreen,
-            border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+            color: AppTheme.primaryColor,
+            border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
           ),
           child: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: RetroTheme.brightGreen,
+                  color: AppTheme.textColor,
                   border: Border(
-                    bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
+                    bottom: BorderSide(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                   ),
                 ),
                 child: Text(
                   '>>> ALL IMAGES TEST <<<',
                   style: TextStyle(
                     fontFamily: 'Courier',
-                    color: RetroTheme.darkGreen,
+                    color: AppTheme.primaryColor,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -924,19 +925,19 @@ void _showAllImagesTest() {
                     final boundary = currentEvent!.boundaries[index];
                     return Container(
                       decoration: BoxDecoration(
-                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
-                        color: RetroTheme.primaryGreen,
+                        border: Border.all(color: AppTheme.textColor, width: 2),
+                        color: Color.fromARGB(255, 122, 185, 203),
                       ),
                       child: Column(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(4),
-                            color: RetroTheme.brightGreen,
+                            color: AppTheme.textColor,
                             child: Text(
                               boundary.name.toUpperCase(),
                               style: TextStyle(
                                 fontFamily: 'Courier',
-                                color: RetroTheme.darkGreen,
+                                color: AppTheme.primaryColor,
                                 fontSize: 8,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -960,15 +961,15 @@ void _showAllImagesTest() {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                     decoration: BoxDecoration(
-                      color: RetroTheme.primaryGreen,
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      color: Color.fromARGB(255, 122, 185, 203),
+                      border: Border.all(color: AppTheme.textColor, width: 2),
                     ),
                     child: Center(
                       child: Text(
                         '[ CLOSE ]',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1015,14 +1016,14 @@ Widget _buildImageWithRetry(String imageUrl) {
         setState(() {}); // Trigger rebuild
       },
       child: Container(
-        color: RetroTheme.primaryGreen,
+        color: Color.fromARGB(255, 122, 185, 203),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.refresh,
-                color: RetroTheme.brightGreen,
+                color: AppTheme.textColor,
                 size: 20,
               ),
               const SizedBox(height: 4),
@@ -1030,7 +1031,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                 'TAP TO RETRY',
                 style: TextStyle(
                   fontFamily: 'Courier',
-                  color: RetroTheme.brightGreen,
+                  color: AppTheme.textColor,
                   fontSize: 8,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1070,7 +1071,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,
-                              RetroTheme.brightGreen.withOpacity(0.8),
+                              AppTheme.textColor.withOpacity(0.8),
                               Colors.transparent,
                             ],
                           ),
@@ -1107,7 +1108,7 @@ Widget _buildImageWithRetry(String imageUrl) {
               emissionFrequency: 0.05,
               numberOfParticles: 50,
               gravity: 0.1,
-              colors: [RetroTheme.brightGreen, RetroTheme.primaryGreen, RetroTheme.lightGreen],
+              colors: [AppTheme.textColor, Color.fromARGB(255, 122, 185, 203), AppTheme.textColor],
             ),
           ),
         ],
@@ -1125,8 +1126,8 @@ Widget _buildImageWithRetry(String imageUrl) {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 3),
+                color: AppTheme.primaryColor,
+                border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 3),
               ),
               child: Column(
                 children: [
@@ -1134,7 +1135,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      border: Border.all(color: AppTheme.textColor, width: 2),
                     ),
                     child: Center(
                       child: AnimatedBuilder(
@@ -1144,8 +1145,8 @@ Widget _buildImageWithRetry(String imageUrl) {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: RetroTheme.primaryGreen.withOpacity(scanlineAnimation.value),
-                              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                              color: Color.fromARGB(255, 122, 185, 203).withOpacity(scanlineAnimation.value),
+                              border: Border.all(color: AppTheme.textColor, width: 1),
                             ),
                           );
                         },
@@ -1157,7 +1158,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                     'INITIALIZING AR CAMERA',
                     style: TextStyle(
                       fontFamily: 'Courier',
-                      color: RetroTheme.brightGreen,
+                      color: AppTheme.textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1167,7 +1168,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                     'LOADING SYSTEM MODULES...',
                     style: TextStyle(
                       fontFamily: 'Courier',
-                      color: RetroTheme.lightGreen,
+                      color: AppTheme.textColor,
                       fontSize: 12,
                     ),
                   ),
@@ -1203,15 +1204,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                   decoration: BoxDecoration(
                     border: Border.all(
                       color: element.isClaimable 
-                          ? RetroTheme.brightGreen 
-                          : RetroTheme.primaryGreen,
+                          ? AppTheme.textColor 
+                          : Color.fromARGB(255, 122, 185, 203),
                       width: element.isClaimable 
                           ? 3 + (pulseAnimation.value * 2) 
                           : 2,
                     ),
                     color: element.isClaimable
-                        ? RetroTheme.darkGreen.withOpacity(0.8 + pulseAnimation.value * 0.2)
-                        : RetroTheme.darkGreen.withOpacity(0.6),
+                        ? AppTheme.primaryColor.withOpacity(0.8 + pulseAnimation.value * 0.2)
+                        : AppTheme.primaryColor.withOpacity(0.6),
                   ),
                   child: Column(
                     children: [
@@ -1220,13 +1221,13 @@ Widget _buildImageWithRetry(String imageUrl) {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         color: element.isClaimable 
-                            ? RetroTheme.brightGreen 
-                            : RetroTheme.primaryGreen,
+                            ? AppTheme.textColor 
+                            : Color.fromARGB(255, 122, 185, 203),
                         child: Text(
                           element.isClaimable ? 'TARGET' : 'DETECTED',
                           style: TextStyle(
                             fontFamily: 'Courier',
-                            color: RetroTheme.darkGreen,
+                            color: AppTheme.primaryColor,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1241,8 +1242,8 @@ Widget _buildImageWithRetry(String imageUrl) {
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: element.isClaimable 
-                                  ? RetroTheme.brightGreen 
-                                  : RetroTheme.primaryGreen,
+                                  ? AppTheme.textColor 
+                                  : Color.fromARGB(255, 122, 185, 203),
                               width: 1,
                             ),
                           ),
@@ -1255,12 +1256,12 @@ Widget _buildImageWithRetry(String imageUrl) {
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                                color: RetroTheme.darkGreen,
+                                color: AppTheme.primaryColor,
                                 child: Text(
                                   'URL: ${element.boundary.imageUrl.length > 15 ? '${element.boundary.imageUrl.substring(0, 15)}...' : element.boundary.imageUrl}',
                                   style: TextStyle(
                                     fontFamily: 'Courier',
-                                    color: RetroTheme.brightGreen,
+                                    color: AppTheme.textColor,
                                     fontSize: 6,
                                   ),
                                   textAlign: TextAlign.center,
@@ -1278,15 +1279,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         color: element.isClaimable 
-                            ? RetroTheme.brightGreen 
-                            : RetroTheme.primaryGreen,
+                            ? AppTheme.textColor
+                            : Color.fromARGB(255, 122, 185, 203),
                         child: Text(
                           element.isClaimable 
                               ? 'TAP TO CLAIM' 
                               : '${element.distance.toStringAsFixed(1)}M',
                           style: TextStyle(
                             fontFamily: 'Courier',
-                            color: RetroTheme.darkGreen,
+                            color: AppTheme.primaryColor,
                             fontSize: 8,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1314,8 +1315,8 @@ Widget _buildImageWithRetry(String imageUrl) {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                color: AppTheme.primaryColor,
+                border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
               ),
               child: Row(
                 children: [
@@ -1327,14 +1328,14 @@ Widget _buildImageWithRetry(String imageUrl) {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                        color: Color.fromARGB(255, 122, 185, 203),
+                        border: Border.all(color: AppTheme.textColor, width: 1),
                       ),
                       child: Text(
                         '<<',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1347,87 +1348,29 @@ Widget _buildImageWithRetry(String imageUrl) {
                       (currentEvent?.name ?? 'EVENT').toUpperCase(),
                       style: TextStyle(
                         fontFamily: 'Courier',
-                        color: RetroTheme.brightGreen,
+                        color: AppTheme.textColor,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _showRetroEventInfo,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
-                      ),
-                      child: Text(
-                        'INFO',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _testDatabaseConnection,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
-                      ),
-                      child: Text(
-                        'TEST',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _testImageLoading,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 1),
-                      ),
-                      child: Text(
-                        'IMG',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
+                  
+                
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: _showImageDebugInfo,
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: RetroTheme.brightGreen,
-                        border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+                        color: AppTheme.textColor,
+                        border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 1),
                       ),
                       child: Text(
-                        'DEBUG',
+                        'MORE',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.darkGreen,
+                          color: AppTheme.primaryColor,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1443,8 +1386,8 @@ Widget _buildImageWithRetry(String imageUrl) {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                color: AppTheme.primaryColor,
+                border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
               ),
               child: Column(
                 children: [
@@ -1457,8 +1400,8 @@ Widget _buildImageWithRetry(String imageUrl) {
                             width: 16,
                             height: 16,
                             decoration: BoxDecoration(
-                              color: RetroTheme.brightGreen.withOpacity(scanlineAnimation.value),
-                              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                              color: AppTheme.textColor.withOpacity(scanlineAnimation.value),
+                              border: Border.all(color: AppTheme.textColor, width: 1),
                             ),
                           );
                         },
@@ -1469,7 +1412,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                           proximityHint,
                           style: TextStyle(
                             fontFamily: 'Courier',
-                            color: RetroTheme.brightGreen,
+                            color: AppTheme.textColor,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1482,14 +1425,14 @@ Widget _buildImageWithRetry(String imageUrl) {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                        color: Color.fromARGB(255, 122, 185, 203),
+                        border: Border.all(color: AppTheme.textColor, width: 1),
                       ),
                       child: Text(
                         'TARGETS IN VIEW: ${arElements.length}',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.darkGreen,
+                          color: AppTheme.primaryColor,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1505,8 +1448,8 @@ Widget _buildImageWithRetry(String imageUrl) {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                color: AppTheme.primaryColor,
+                border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
               ),
               child: Column(
                 children: [
@@ -1517,7 +1460,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                         'PROGRESS',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1526,7 +1469,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                         '${claimedCount.clamp(0, totalBoundaries)}/$totalBoundaries',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.lightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1539,19 +1482,19 @@ Widget _buildImageWithRetry(String imageUrl) {
                   Container(
                     height: 16,
                     decoration: BoxDecoration(
-                      border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+                      border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 1),
                     ),
                     child: Stack(
                       children: [
-                        Container(color: RetroTheme.darkGreen),
+                        Container(color: AppTheme.primaryColor),
                         FractionallySizedBox(
                           widthFactor: totalBoundaries > 0 
                               ? (claimedCount / totalBoundaries).clamp(0.0, 1.0) 
                               : 0,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: RetroTheme.brightGreen,
-                              border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                              color: AppTheme.textColor,
+                              border: Border.all(color: AppTheme.textColor, width: 1),
                             ),
                           ),
                         ),
@@ -1593,15 +1536,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                     decoration: BoxDecoration(
-                      color: RetroTheme.darkGreen,
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                      color: AppTheme.primaryColor,
+                      border: Border.all(color: AppTheme.textColor, width: 2),
                     ),
                     child: Center(
                       child: Text(
                         'CLAIMED ($claimedCount)',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1617,15 +1560,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                     decoration: BoxDecoration(
-                      color: RetroTheme.darkGreen,
-                      border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                      color: AppTheme.primaryColor,
+                      border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                     ),
                     child: Center(
                       child: Text(
                         'EVENT INFO',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.primaryGreen,
+                          color: Color.fromARGB(255, 122, 185, 203),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1648,8 +1591,8 @@ Widget _buildImageWithRetry(String imageUrl) {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: RetroTheme.darkGreen,
-            border: Border.all(color: RetroTheme.primaryGreen, width: 3),
+            color: AppTheme.primaryColor,
+            border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 3),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1661,15 +1604,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      border: Border.all(color: RetroTheme.brightGreen, width: 2),
-                      color: RetroTheme.primaryGreen.withOpacity(scanlineAnimation.value * 0.5),
+                      border: Border.all(color: AppTheme.textColor, width: 2),
+                      color: Color.fromARGB(255, 122, 185, 203).withOpacity(scanlineAnimation.value * 0.5),
                     ),
                     child: Center(
                       child: Text(
                         'AR',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.brightGreen,
+                          color: AppTheme.textColor,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1683,7 +1626,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                 'LOADING EVENT DATA...',
                 style: TextStyle(
                   fontFamily: 'Courier',
-                  color: RetroTheme.brightGreen,
+                  color: AppTheme.textColor,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1693,7 +1636,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                 'CODE: ${widget.eventCode}',
                 style: TextStyle(
                   fontFamily: 'Courier',
-                  color: RetroTheme.lightGreen,
+                  color: AppTheme.textColor,
                   fontSize: 12,
                 ),
               ),
@@ -1713,22 +1656,22 @@ Widget _buildImageWithRetry(String imageUrl) {
           height: MediaQuery.of(context).size.height * 0.7,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: RetroTheme.primaryGreen,
-            border: Border.all(color: RetroTheme.brightGreen, width: 3),
+            color: Color.fromARGB(255, 122, 185, 203),
+            border: Border.all(color: AppTheme.textColor, width: 3),
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: RetroTheme.darkGreen,
-              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+              color: AppTheme.primaryColor,
+              border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
             ),
             child: Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     border: Border(
-                      bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
+                      bottom: BorderSide(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                     ),
                   ),
                   child: Row(
@@ -1737,7 +1680,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                         '>>> CLAIMED NFTS <<<',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.darkGreen,
+                          color: AppTheme.primaryColor,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1747,7 +1690,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                         '($claimedCount)',
                         style: TextStyle(
                           fontFamily: 'Courier',
-                          color: RetroTheme.darkGreen,
+                          color: AppTheme.primaryColor,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1765,14 +1708,14 @@ Widget _buildImageWithRetry(String imageUrl) {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                                  border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                                 ),
                                 child: Center(
                                   child: Text(
                                     '?',
                                     style: TextStyle(
                                       fontFamily: 'Courier',
-                                      color: RetroTheme.primaryGreen,
+                                      color: Color.fromARGB(255, 122, 185, 203),
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -1784,7 +1727,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                                 'NO NFTS CLAIMED YET',
                                 style: TextStyle(
                                   fontFamily: 'Courier',
-                                  color: RetroTheme.primaryGreen,
+                                  color: Color.fromARGB(255, 122, 185, 203),
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -1794,7 +1737,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                                 'EXPLORE THE AREA TO FIND TARGETS',
                                 style: TextStyle(
                                   fontFamily: 'Courier',
-                                  color: RetroTheme.lightGreen,
+                                  color: AppTheme.textColor,
                                   fontSize: 10,
                                 ),
                                 textAlign: TextAlign.center,
@@ -1811,8 +1754,8 @@ Widget _buildImageWithRetry(String imageUrl) {
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: RetroTheme.primaryGreen,
-                                border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                                color: Color.fromARGB(255, 122, 185, 203),
+                                border: Border.all(color: AppTheme.textColor, width: 1),
                               ),
                               child: Row(
                                 children: [
@@ -1820,7 +1763,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                                     width: 32,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                                      border: Border.all(color: AppTheme.textColor, width: 1),
                                     ),
                                     child: _buildImageWithRetry(boundary.imageUrl),
                                   ),
@@ -1833,7 +1776,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                                           boundary.name.toUpperCase(),
                                           style: TextStyle(
                                             fontFamily: 'Courier',
-                                            color: RetroTheme.darkGreen,
+                                            color: AppTheme.primaryColor,
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1842,7 +1785,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                                           boundary.description.toUpperCase(),
                                           style: TextStyle(
                                             fontFamily: 'Courier',
-                                            color: RetroTheme.darkGreen,
+                                            color: AppTheme.primaryColor,
                                             fontSize: 8,
                                           ),
                                         ),
@@ -1852,14 +1795,14 @@ Widget _buildImageWithRetry(String imageUrl) {
                                   Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: RetroTheme.brightGreen,
-                                      border: Border.all(color: RetroTheme.lightGreen, width: 1),
+                                      color: AppTheme.textColor,
+                                      border: Border.all(color: AppTheme.textColor, width: 1),
                                     ),
                                     child: Text(
                                       'CLAIMED',
                                       style: TextStyle(
                                         fontFamily: 'Courier',
-                                        color: RetroTheme.darkGreen,
+                                        color: AppTheme.primaryColor,
                                         fontSize: 8,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -1878,15 +1821,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                       decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                        color: Color.fromARGB(255, 122, 185, 203),
+                        border: Border.all(color: AppTheme.textColor, width: 2),
                       ),
                       child: Center(
                         child: Text(
                           '[ CLOSE ]',
                           style: TextStyle(
                             fontFamily: 'Courier',
-                            color: RetroTheme.brightGreen,
+                            color: AppTheme.textColor,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1903,147 +1846,8 @@ Widget _buildImageWithRetry(String imageUrl) {
     );
   }
 
-  void _testImageLoading() async {
-    try {
-      print('=== TESTING IMAGE LOADING ===');
-      
-      if (currentEvent == null) {
-        print('No current event to test');
-        return;
-      }
-      
-      print('Current event: ${currentEvent!.name}');
-      print('Event image URL: ${currentEvent!.eventImageUrl}');
-      print('Boundaries count: ${currentEvent!.boundaries.length}');
-      
-      // Test each boundary image
-      for (int i = 0; i < currentEvent!.boundaries.length; i++) {
-        final boundary = currentEvent!.boundaries[i];
-        print('Boundary $i:');
-        print('  - Name: ${boundary.name}');
-        print('  - Image URL: ${boundary.imageUrl}');
-        print('  - URL type: ${boundary.imageUrl.runtimeType}');
-        print('  - Starts with http: ${boundary.imageUrl.startsWith('http')}');
-        print('  - Starts with https: ${boundary.imageUrl.startsWith('https')}');
-        
-        // Test if URL is accessible
-        if (boundary.imageUrl.startsWith('http')) {
-          print('  - Valid HTTP URL format');
-        } else {
-          print('  - Invalid URL format - not starting with http/https');
-        }
-      }
-      
-      // Show results in UI
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 1),
-              ),
-              child: Text(
-                'IMG TEST: Check console for details',
-                style: TextStyle(
-                  fontFamily: 'Courier',
-                  color: RetroTheme.brightGreen,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            backgroundColor: Colors.transparent,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error testing image loading: $e');
-    }
-  }
 
-  void _testDatabaseConnection() async {
-    try {
-      print('=== TESTING DATABASE CONNECTION ===');
-      
-      // Test basic connection
-      final connectionTest = await supabaseService.testDatabaseConnection();
-      print('Database connection test: ${connectionTest ? "SUCCESS" : "FAILED"}');
-      
-      // Get all event codes
-      final eventCodes = await supabaseService.getAllEventCodes();
-      print('Available event codes: $eventCodes');
-      
-      // Test specific event code
-      if (widget.eventCode.isNotEmpty) {
-        final eventExists = await supabaseService.testEventCodeExists(widget.eventCode);
-        print('Event code ${widget.eventCode} exists: $eventExists');
-      }
-      
-      // Test image URLs for current event
-      if (currentEvent != null) {
-        print('=== TESTING IMAGE URLS ===');
-        print('Event image URL: ${currentEvent!.eventImageUrl}');
-        print('Boundaries count: ${currentEvent!.boundaries.length}');
-        for (int i = 0; i < currentEvent!.boundaries.length; i++) {
-          final boundary = currentEvent!.boundaries[i];
-          print('Boundary $i image URL: ${boundary.imageUrl}');
-        }
-      }
-      
-      // Show results in UI
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 1),
-              ),
-              child: Text(
-                'DB TEST: ${connectionTest ? "OK" : "FAILED"} | EVENTS: ${eventCodes.length}',
-                style: TextStyle(
-                  fontFamily: 'Courier',
-                  color: RetroTheme.brightGreen,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            backgroundColor: Colors.transparent,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error testing database connection: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 1),
-              ),
-              child: Text(
-                'DB TEST ERROR: $e',
-                style: TextStyle(
-                  fontFamily: 'Courier',
-                  color: RetroTheme.brightGreen,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            backgroundColor: Colors.transparent,
-          ),
-        );
-      }
-    }
-  }
-
+ 
   void _showRetroEventInfo() {
     if (currentEvent == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2051,14 +1855,14 @@ Widget _buildImageWithRetry(String imageUrl) {
           content: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: RetroTheme.darkGreen,
-              border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+              color: AppTheme.primaryColor,
+              border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 1),
             ),
             child: Text(
               'EVENT DATA NOT AVAILABLE',
               style: TextStyle(
                 fontFamily: 'Courier',
-                color: RetroTheme.brightGreen,
+                color: AppTheme.textColor,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -2078,29 +1882,29 @@ Widget _buildImageWithRetry(String imageUrl) {
           height: MediaQuery.of(context).size.height * 0.6,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: RetroTheme.primaryGreen,
-            border: Border.all(color: RetroTheme.brightGreen, width: 3),
+            color: Color.fromARGB(255, 122, 185, 203),
+            border: Border.all(color: AppTheme.textColor, width: 3),
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: RetroTheme.darkGreen,
-              border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+              color: AppTheme.primaryColor,
+              border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
             ),
             child: Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: RetroTheme.brightGreen,
+                    color: AppTheme.textColor,
                     border: Border(
-                      bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
+                      bottom: BorderSide(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                     ),
                   ),
                   child: Text(
                     '>>> EVENT DATA <<<',
                     style: TextStyle(
                       fontFamily: 'Courier',
-                      color: RetroTheme.darkGreen,
+                      color: AppTheme.primaryColor,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2133,15 +1937,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                       decoration: BoxDecoration(
-                        color: RetroTheme.primaryGreen,
-                        border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                        color: Color.fromARGB(255, 122, 185, 203),
+                        border: Border.all(color: AppTheme.textColor, width: 2),
                       ),
                       child: Center(
                         child: Text(
                           '[ CLOSE ]',
                           style: TextStyle(
                             fontFamily: 'Courier',
-                            color: RetroTheme.brightGreen,
+                            color: AppTheme.textColor,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2169,7 +1973,7 @@ Widget _buildImageWithRetry(String imageUrl) {
             style: TextStyle(
               fontFamily: 'Courier',
               fontSize: 10,
-              color: RetroTheme.lightGreen,
+              color: AppTheme.textColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -2177,15 +1981,15 @@ Widget _buildImageWithRetry(String imageUrl) {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: RetroTheme.primaryGreen,
-              border: Border.all(color: RetroTheme.brightGreen, width: 1),
+              color: Color.fromARGB(255, 122, 185, 203),
+              border: Border.all(color: AppTheme.textColor, width: 1),
             ),
             child: Text(
               value,
               style: TextStyle(
                 fontFamily: 'Courier',
                 fontSize: 12,
-                color: RetroTheme.darkGreen,
+                color: AppTheme.primaryColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -2218,29 +2022,29 @@ Widget _buildImageWithRetry(String imageUrl) {
             height: MediaQuery.of(context).size.height * 0.8,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: RetroTheme.primaryGreen,
-              border: Border.all(color: RetroTheme.brightGreen, width: 3),
+              color: Color.fromARGB(255, 122, 185, 203),
+              border: Border.all(color: AppTheme.textColor, width: 3),
             ),
             child: Container(
               decoration: BoxDecoration(
-                color: RetroTheme.darkGreen,
-                border: Border.all(color: RetroTheme.primaryGreen, width: 2),
+                color: AppTheme.primaryColor,
+                border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 2),
               ),
               child: Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: RetroTheme.brightGreen,
+                      color: AppTheme.textColor,
                       border: Border(
-                        bottom: BorderSide(color: RetroTheme.primaryGreen, width: 2),
+                        bottom: BorderSide(color: Color.fromARGB(255, 122, 185, 203), width: 2),
                       ),
                     ),
                     child: Text(
                       '>>> IMAGE DEBUG INFO <<<',
                       style: TextStyle(
                         fontFamily: 'Courier',
-                        color: RetroTheme.darkGreen,
+                        color: AppTheme.primaryColor,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -2264,7 +2068,7 @@ Widget _buildImageWithRetry(String imageUrl) {
                             'BOUNDARY IMAGES:',
                             style: TextStyle(
                               fontFamily: 'Courier',
-                              color: RetroTheme.brightGreen,
+                              color: AppTheme.textColor,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2276,8 +2080,8 @@ Widget _buildImageWithRetry(String imageUrl) {
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: RetroTheme.primaryGreen,
-                                border: Border.all(color: RetroTheme.brightGreen, width: 1),
+                                color: Color.fromARGB(255, 122, 185, 203),
+                                border: Border.all(color: AppTheme.textColor, width: 1),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2304,15 +2108,15 @@ Widget _buildImageWithRetry(String imageUrl) {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                         decoration: BoxDecoration(
-                          color: RetroTheme.primaryGreen,
-                          border: Border.all(color: RetroTheme.brightGreen, width: 2),
+                          color: Color.fromARGB(255, 122, 185, 203),
+                          border: Border.all(color: AppTheme.textColor, width: 2),
                         ),
                         child: Center(
                           child: Text(
                             '[ CLOSE ]',
                             style: TextStyle(
                               fontFamily: 'Courier',
-                              color: RetroTheme.brightGreen,
+                              color: AppTheme.textColor,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2343,7 +2147,7 @@ Widget _buildImageWithRetry(String imageUrl) {
             style: TextStyle(
               fontFamily: 'Courier',
               fontSize: 10,
-              color: RetroTheme.lightGreen,
+              color: AppTheme.textColor,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -2351,15 +2155,15 @@ Widget _buildImageWithRetry(String imageUrl) {
             width: double.infinity,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: RetroTheme.darkGreen,
-              border: Border.all(color: RetroTheme.primaryGreen, width: 1),
+              color: AppTheme.primaryColor,
+              border: Border.all(color: Color.fromARGB(255, 122, 185, 203), width: 1),
             ),
             child: Text(
               value,
               style: TextStyle(
                 fontFamily: 'Courier',
                 fontSize: 8,
-                color: RetroTheme.brightGreen,
+                color: AppTheme.textColor,
                 fontWeight: FontWeight.bold,
               ),
               maxLines: 3,

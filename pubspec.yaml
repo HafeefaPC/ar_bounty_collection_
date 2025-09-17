@@ -114,6 +114,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   build_runner: ^2.4.13
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
 
 
 flutter_launcher_icons:
@@ -133,6 +134,21 @@ flutter_launcher_icons:
   macos:
     generate: true
     image_path: "assets/icons/icons.png"
+
+flutter_native_splash:
+  color: "#FFF59D"
+  color_dark: "#FFF59D"
+  image: assets/icons/icons.png
+  image_dark: assets/icons/icons.png
+  android: true
+  ios: true
+  web: false
+  android_12:
+    color: "#FFF59D"
+    color_dark: "#FFF59D"
+    image: assets/icons/icons.png
+    image_dark: assets/icons/icons.png
+  fullscreen: false
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
